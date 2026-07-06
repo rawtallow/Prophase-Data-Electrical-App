@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { toast, confirmDialog } from '../ui-feedback';
+import Modal from '../modal';
 
 function money(n) {
   return '$' + (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -150,9 +151,9 @@ export default function JobsApp({ initialJobs, clients, laborByJob, fullAccess, 
         {list.length === 0 && <div className="empty">No jobs match your filters.</div>}
       </div>
 
-      {modal && (
-        <div className="modal-overlay active">
-          <div className="modal">
+      <Modal open={!!modal}>
+        {modal && (
+          <>
             <h3>{modal.id ? `Edit Job ${modal.jobNumber}` : 'New Job'}</h3>
             <div className="grid-2">
               <div className="field">
@@ -197,9 +198,9 @@ export default function JobsApp({ initialJobs, clients, laborByJob, fullAccess, 
               <button className="btn ghost" disabled={saving} onClick={() => setModal(null)}>Cancel</button>
               <button className="btn amber" disabled={saving} onClick={save}>{saving ? 'Saving…' : 'Save Job'}</button>
             </div>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </Modal>
     </>
   );
 }

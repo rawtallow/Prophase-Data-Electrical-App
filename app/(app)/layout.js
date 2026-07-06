@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import NavLinks from './nav-links';
 import LogoutButton from './logout-button';
 import { FeedbackHost } from './ui-feedback';
+import PageTransition from './page-transition';
 
 export default async function AppLayout({ children }) {
   const session = await getSession();
@@ -25,7 +26,9 @@ export default async function AppLayout({ children }) {
         </div>
       </header>
       <NavLinks role={session.role} />
-      <main className="container">{children}</main>
+      <main className="container">
+        <PageTransition>{children}</PageTransition>
+      </main>
       <FeedbackHost />
     </>
   );

@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { toast, confirmDialog } from '../ui-feedback';
+import Modal from '../modal';
 
 export default function ClientsApp({ initialClients, initialAssets, canManage }) {
   const [clients, setClients] = useState(initialClients);
@@ -170,9 +171,9 @@ export default function ClientsApp({ initialClients, initialAssets, canManage })
         {clients.length === 0 && <div className="empty">No clients yet.</div>}
       </div>
 
-      {clientModal && (
-        <div className="modal-overlay active">
-          <div className="modal">
+      <Modal open={!!clientModal}>
+        {clientModal && (
+          <>
             <h3>{clientModal.id ? 'Edit Client' : 'New Client'}</h3>
             <div className="field">
               <label>Name *</label>
@@ -198,13 +199,13 @@ export default function ClientsApp({ initialClients, initialAssets, canManage })
                 {savingClient ? 'Saving…' : 'Save Client'}
               </button>
             </div>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </Modal>
 
-      {assetModal && (
-        <div className="modal-overlay active">
-          <div className="modal" style={{ maxWidth: 760 }}>
+      <Modal open={!!assetModal} wide>
+        {assetModal && (
+          <>
             <h3>Assets — {assetModal.client.name}</h3>
             {canManage && (
               <>
@@ -273,9 +274,9 @@ export default function ClientsApp({ initialClients, initialAssets, canManage })
             <div className="modal-actions">
               <button className="btn ghost" onClick={() => setAssetModal(null)}>Close</button>
             </div>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </Modal>
     </>
   );
 }

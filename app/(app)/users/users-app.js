@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { toast, confirmDialog } from '../ui-feedback';
+import Modal from '../modal';
 
 function fmtDate(d) {
   return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -97,9 +98,9 @@ export default function UsersApp({ initialUsers, myId }) {
         </table>
       </div>
 
-      {modal && (
-        <div className="modal-overlay active">
-          <div className="modal">
+      <Modal open={!!modal}>
+        {modal && (
+          <>
             <h3>{modal.id ? 'Edit Account' : 'New Account'}</h3>
             {error && <div className="error-box">{error}</div>}
             <div className="field"><label>Name *</label><input value={modal.name} onChange={(e) => setModal({ ...modal, name: e.target.value })} /></div>
@@ -139,9 +140,9 @@ export default function UsersApp({ initialUsers, myId }) {
                 {saving ? 'Saving…' : modal.id ? 'Save Changes' : 'Create Account'}
               </button>
             </div>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </Modal>
     </>
   );
 }

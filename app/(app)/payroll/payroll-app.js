@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { toast, confirmDialog } from '../ui-feedback';
+import Modal from '../modal';
 
 function money(n) {
   return '$' + (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -215,7 +216,7 @@ export default function PayrollApp({ initialEmployees, initialEntries, initialDr
       </div>
 
       {sub === 'employees' && (
-        <>
+        <div key={sub} className="page-transition">
           <div className="toolbar">
             <h2 className="section-title" style={{ margin: 0 }}>Employees</h2>
             <button className="btn amber sm" onClick={() => setEmpModal(emptyEmp())}>+ New Employee</button>
@@ -247,11 +248,11 @@ export default function PayrollApp({ initialEmployees, initialEntries, initialDr
             </table>
             {employees.length === 0 && <div className="empty">No employees yet. Add your crew here so you can log their pay runs.</div>}
           </div>
-        </>
+        </div>
       )}
 
       {sub === 'payruns' && (
-        <>
+        <div key={sub} className="page-transition">
           <div className="toolbar">
             <h2 className="section-title" style={{ margin: 0 }}>Pay Runs</h2>
             <div className="filters">
@@ -292,11 +293,11 @@ export default function PayrollApp({ initialEmployees, initialEntries, initialDr
             </table>
             {filteredEntries.length === 0 && <div className="empty">No pay runs logged yet.</div>}
           </div>
-        </>
+        </div>
       )}
 
       {sub === 'draws' && (
-        <>
+        <div key={sub} className="page-transition">
           <div className="toolbar">
             <h2 className="section-title" style={{ margin: 0 }}>Owner Draws</h2>
             <button className="btn amber sm" onClick={() => setDrawModal(emptyDraw())}>+ New Draw</button>
@@ -328,12 +329,12 @@ export default function PayrollApp({ initialEmployees, initialEntries, initialDr
             </table>
             {draws.length === 0 && <div className="empty">No owner draws logged yet.</div>}
           </div>
-        </>
+        </div>
       )}
 
-      {empModal && (
-        <div className="modal-overlay active">
-          <div className="modal">
+      <Modal open={!!empModal}>
+        {empModal && (
+          <>
             <h3>{empModal.id ? 'Edit Employee' : 'New Employee'}</h3>
             <div className="field"><label>Name *</label><input value={empModal.name} onChange={(e) => setEmpModal({ ...empModal, name: e.target.value })} /></div>
             <div className="grid-2">
@@ -350,13 +351,13 @@ export default function PayrollApp({ initialEmployees, initialEntries, initialDr
               <button className="btn ghost" disabled={savingEmp} onClick={() => setEmpModal(null)}>Cancel</button>
               <button className="btn amber" disabled={savingEmp} onClick={saveEmp}>{savingEmp ? 'Saving…' : 'Save Employee'}</button>
             </div>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </Modal>
 
-      {payModal && (
-        <div className="modal-overlay active">
-          <div className="modal" style={{ maxWidth: 760 }}>
+      <Modal open={!!payModal} wide>
+        {payModal && (
+          <>
             <h3>{payModal.id ? `Edit Pay Run ${payModal.payNumber}` : 'New Pay Run'}</h3>
             <div className="grid-3">
               <div className="field">
@@ -423,13 +424,13 @@ export default function PayrollApp({ initialEmployees, initialEntries, initialDr
               <button className="btn ghost" disabled={savingPay} onClick={() => setPayModal(null)}>Cancel</button>
               <button className="btn amber" disabled={savingPay} onClick={savePay}>{savingPay ? 'Saving…' : 'Save Pay Run'}</button>
             </div>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </Modal>
 
-      {drawModal && (
-        <div className="modal-overlay active">
-          <div className="modal">
+      <Modal open={!!drawModal}>
+        {drawModal && (
+          <>
             <h3>{drawModal.id ? 'Edit Owner Draw' : 'New Owner Draw'}</h3>
             <div className="grid-2">
               <div className="field"><label>Date *</label><input type="date" value={drawModal.date} onChange={(e) => setDrawModal({ ...drawModal, date: e.target.value })} /></div>
@@ -440,9 +441,9 @@ export default function PayrollApp({ initialEmployees, initialEntries, initialDr
               <button className="btn ghost" disabled={savingDraw} onClick={() => setDrawModal(null)}>Cancel</button>
               <button className="btn amber" disabled={savingDraw} onClick={saveDraw}>{savingDraw ? 'Saving…' : 'Save Draw'}</button>
             </div>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </Modal>
     </>
   );
 }

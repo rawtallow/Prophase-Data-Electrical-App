@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { toast, confirmDialog } from '../ui-feedback';
+import Modal from '../modal';
 
 function money(n) {
   return '$' + (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -134,9 +135,9 @@ export default function PartsApp({ initialParts, canManage }) {
         {list.length === 0 && <div className="empty">No parts logged yet.</div>}
       </div>
 
-      {modal && (
-        <div className="modal-overlay active">
-          <div className="modal">
+      <Modal open={!!modal}>
+        {modal && (
+          <>
             <h3>{modal.id ? 'Edit Part' : 'New Part'}</h3>
             <div className="grid-2">
               <div className="field"><label>Name *</label><input value={modal.name} onChange={(e) => setModal({ ...modal, name: e.target.value })} /></div>
@@ -156,9 +157,9 @@ export default function PartsApp({ initialParts, canManage }) {
               <button className="btn ghost" disabled={saving} onClick={() => setModal(null)}>Cancel</button>
               <button className="btn amber" disabled={saving} onClick={save}>{saving ? 'Saving…' : 'Save Part'}</button>
             </div>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </Modal>
     </>
   );
 }

@@ -213,12 +213,20 @@ input:focus, select:focus, textarea:focus {
 
 .tabs a, .subtabs a { transition: color .15s ease, border-bottom-color .18s ease; }
 
-.modal-overlay.active { animation: overlayIn .15s ease; }
-.modal { animation: modalIn .18s cubic-bezier(0.16, 1, 0.3, 1); }
+.modal-overlay.active { animation: overlayIn .15s ease forwards; }
+.modal { animation: modalIn .18s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.modal.modal-wide { max-width: 760px; }
+.modal-overlay.active.closing { animation: overlayOut .16s ease forwards; }
+.modal.closing { animation: modalOut .16s cubic-bezier(0.4, 0, 1, 1) forwards; }
 @keyframes overlayIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes overlayOut { from { opacity: 1; } to { opacity: 0; } }
 @keyframes modalIn {
   from { opacity: 0; transform: translateY(10px) scale(0.97); }
   to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes modalOut {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(6px) scale(0.98); }
 }
 
 .toast-stack {
@@ -229,8 +237,9 @@ input:focus, select:focus, textarea:focus {
   background: #1c2733; color: #fff; padding: 12px 16px; border-radius: 8px;
   font-size: 13.5px; font-weight: 600; box-shadow: 0 6px 20px rgba(10,10,10,0.28);
   border-left: 4px solid var(--amber);
-  animation: toastIn .2s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: toastIn .2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+.toast.leaving { animation: toastOut .18s cubic-bezier(0.4, 0, 1, 1) forwards; }
 .toast-success { border-left-color: var(--green); }
 .toast-error { border-left-color: var(--red); }
 .toast-info { border-left-color: var(--blue); }
@@ -238,10 +247,22 @@ input:focus, select:focus, textarea:focus {
   from { opacity: 0; transform: translateX(20px); }
   to { opacity: 1; transform: translateX(0); }
 }
+@keyframes toastOut {
+  from { opacity: 1; transform: translateX(0); max-height: 60px; margin-bottom: 8px; }
+  to { opacity: 0; transform: translateX(20px); }
+}
 
 .confirm-message { color: var(--text); font-size: 14px; line-height: 1.5; margin: 0 0 4px; }
 .btn.danger-solid { background: var(--red); color: #fff; }
 .btn.danger-solid:hover:not(:disabled) { background: #a5311f; }
+
+/* Page/tab content transition — replays on route change (key={pathname})
+   or sub-tab switch (key={activeSubTab}) since it forces a fresh DOM node. */
+.page-transition { animation: pageIn .22s cubic-bezier(0.16, 1, 0.3, 1); }
+@keyframes pageIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
