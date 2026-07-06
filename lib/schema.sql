@@ -143,3 +143,20 @@ create table if not exists login_attempts (
   first_failed_at timestamptz,
   locked_until timestamptz
 );
+
+-- Tax-deductible purchase receipts. Anyone can add one (photo is analyzed by
+-- Claude to pre-fill these fields, then reviewed/edited before saving);
+-- editing/deleting is restricted to admin/manager, same as other financial
+-- records in this app.
+create table if not exists receipts (
+  id uuid primary key default gen_random_uuid(),
+  vendor text not null default '',
+  purchase_date date,
+  amount numeric not null default 0,
+  gst_amount numeric not null default 0,
+  category text not null default 'Other',
+  description text default '',
+  image_url text not null,
+  uploaded_by text not null default '',
+  created_at timestamptz not null default now()
+);

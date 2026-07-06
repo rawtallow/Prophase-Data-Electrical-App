@@ -19,7 +19,7 @@ const securityHeaders = [
       "default-src 'self'",
       `script-src ${scriptSrc}`,
       "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob:",
+      "img-src 'self' data: blob: https://*.public.blob.vercel-storage.com",
       "font-src 'self'",
       "connect-src 'self'",
       "object-src 'none'",

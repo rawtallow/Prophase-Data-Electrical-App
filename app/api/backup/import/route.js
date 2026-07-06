@@ -34,7 +34,8 @@ export async function POST(req) {
     sql`delete from employees`,
     sql`delete from owner_draws`,
     sql`delete from parts`,
-    sql`delete from clients`
+    sql`delete from clients`,
+    sql`delete from receipts`
   ];
 
   for (const c of data.clients) {
@@ -95,6 +96,14 @@ export async function POST(req) {
   if (Array.isArray(data.counters)) {
     for (const c of data.counters) {
       queries.push(sql`insert into counters (key, value) values (${c.key}, ${c.value}) on conflict (key) do update set value = ${c.value}`);
+    }
+  }
+  if (Array.isArray(data.receipts)) {
+    for (const r of data.receipts) {
+      queries.push(sql`
+        insert into receipts (id, vendor, purchase_date, amount, gst_amount, category, description, image_url, uploaded_by, created_at)
+        values (${r.id}, ${r.vendor}, ${r.purchase_date}, ${r.amount}, ${r.gst_amount}, ${r.category}, ${r.description}, ${r.image_url}, ${r.uploaded_by}, ${r.created_at})
+      `);
     }
   }
 

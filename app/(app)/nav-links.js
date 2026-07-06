@@ -14,6 +14,7 @@ export default function NavLinks({ role }) {
     { href: '/payroll', label: 'Payroll', show: fullAccess },
     { href: '/parts', label: 'Spare Parts', show: true },
     { href: '/clients', label: 'Clients', show: true },
+    { href: '/receipts', label: 'Receipts', show: true },
     { href: '/users', label: 'Users', show: role === 'admin' },
     { href: '/backup', label: 'Backup', show: fullAccess }
   ];

@@ -7,7 +7,16 @@ function money(n) {
   return '$' + (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 function slug(s) { return String(s).toLowerCase().replace(/\s+/g, ''); }
-function dstr(d) { return d ? String(d).slice(0, 10) : ''; }
+function dstr(d) {
+  if (!d) return '';
+  if (d instanceof Date) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+  return String(d).slice(0, 10);
+}
 
 const STATUSES = ['Quoted', 'Scheduled', 'In Progress', 'Complete'];
 
