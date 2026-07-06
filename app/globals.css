@@ -257,11 +257,31 @@ input:focus, select:focus, textarea:focus {
 .btn.danger-solid:hover:not(:disabled) { background: #a5311f; }
 
 /* Page/tab content transition — replays on route change (key={pathname})
-   or sub-tab switch (key={activeSubTab}) since it forces a fresh DOM node. */
-.page-transition { animation: pageIn .22s cubic-bezier(0.16, 1, 0.3, 1); }
+   or sub-tab switch (key={activeSubTab}) since it forces a fresh DOM node.
+   Kept short and subtle: the loading.js skeleton below already covers the
+   perceived-wait job, so this is just a quick settle-in, not a cover for
+   network latency. */
+.page-transition { animation: pageIn .14s ease-out; }
 @keyframes pageIn {
-  from { opacity: 0; transform: translateY(6px); }
+  from { opacity: 0; transform: translateY(3px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+/* Loading skeleton (app/(app)/loading.js) */
+.skeleton-line, .skeleton-row {
+  border-radius: 4px;
+  background: linear-gradient(90deg, #eceff3 25%, #e2e6ec 37%, #eceff3 63%);
+  background-size: 400% 100%;
+  animation: skeletonShimmer 1.4s ease infinite;
+}
+.skeleton-line-sm { width: 55%; height: 11px; margin-bottom: 12px; }
+.skeleton-line-lg { width: 40%; height: 22px; }
+.skeleton-line-md { width: 220px; height: 16px; }
+.skeleton-row { height: 16px; margin-bottom: 12px; }
+.skeleton-row:last-child { margin-bottom: 0; }
+@keyframes skeletonShimmer {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
 }
 
 @media (prefers-reduced-motion: reduce) {

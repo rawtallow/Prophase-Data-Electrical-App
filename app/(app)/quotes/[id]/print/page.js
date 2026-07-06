@@ -11,10 +11,12 @@ function dstr(d) {
 }
 
 export default async function PrintQuotePage({ params }) {
-  const quotes = await sql`select * from quotes where id = ${params.id}`;
+  const [quotes, lineItems] = await Promise.all([
+    sql`select * from quotes where id = ${params.id}`,
+    sql`select * from quote_line_items where quote_id = ${params.id} order by sort_order asc`
+  ]);
   const q = quotes[0];
   if (!q) notFound();
-  const lineItems = await sql`select * from quote_line_items where quote_id = ${params.id} order by sort_order asc`;
 
   return (
     <div style={{ maxWidth: 760, margin: '0 auto' }}>

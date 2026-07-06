@@ -16,8 +16,16 @@ export default async function DashboardPage() {
   const session = await getSession();
   const fullAccess = CAN.viewFinancials(session.role);
 
-  const jobs = await sql`select * from jobs order by created_date desc limit 200`;
-  const parts = await sql`select * from parts`;
+  // All independent — fire together instead of waiting on each in turn.
+  // The financial queries are skipped entirely for employee-role sessions,
+  // which don't use them.
+  const [jobs, parts, quotes, payrollEntries, draws] = await Promise.all([
+    sql`select * from jobs order by created_date desc limit 200`,
+    sql`select * from parts`,
+    fullAccess ? sql`select * from quotes order by created_at desc limit 200` : Promise.resolve([]),
+    fullAccess ? sql`select * from payroll_entries` : Promise.resolve([]),
+    fullAccess ? sql`select * from owner_draws` : Promise.resolve([])
+  ]);
   const lowStock = parts.filter((p) => Number(p.reorder_threshold) > 0 && Number(p.qty_on_hand) <= Number(p.reorder_threshold));
 
   if (!fullAccess) {
@@ -56,10 +64,6 @@ export default async function DashboardPage() {
       </>
     );
   }
-
-  const quotes = await sql`select * from quotes order by created_at desc limit 200`;
-  const payrollEntries = await sql`select * from payroll_entries`;
-  const draws = await sql`select * from owner_draws`;
 
   const openQuotes = quotes.filter((q) => q.status === 'Draft' || q.status === 'Sent').length;
   const activeJobs = jobs.filter((j) => j.status !== 'Complete');
