@@ -37,6 +37,7 @@ export async function POST(req) {
 
     return NextResponse.json({ ok: true });
   } catch (err) {
-    return NextResponse.json({ error: err.message || 'Setup failed.' }, { status: 500 });
+    console.error('Setup error:', err);
+    return NextResponse.json({ error: 'Setup failed. Please try again.' }, { status: 500 });
   }
 }

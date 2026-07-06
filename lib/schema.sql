@@ -135,3 +135,11 @@ create table if not exists parts (
   reorder_threshold numeric not null default 0,
   notes text default ''
 );
+
+-- Failed-login tracking for brute-force lockout (see app/api/auth/login).
+create table if not exists login_attempts (
+  key text primary key,
+  count int not null default 0,
+  first_failed_at timestamptz,
+  locked_until timestamptz
+);
