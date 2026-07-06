@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { toast, confirmDialog } from '../ui-feedback';
 
 function money(n) {
   return '$' + (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -21,6 +22,10 @@ export default function PayrollApp({ initialEmployees, initialEntries, initialDr
   const [payModal, setPayModal] = useState(null);
   const [drawModal, setDrawModal] = useState(null);
   const [payFilter, setPayFilter] = useState('');
+  const [savingEmp, setSavingEmp] = useState(false);
+  const [savingPay, setSavingPay] = useState(false);
+  const [savingDraw, setSavingDraw] = useState(false);
+  const [busyId, setBusyId] = useState(null);
 
   async function refreshAll() {
     const [e, p, d] = await Promise.all([
@@ -48,16 +53,39 @@ export default function PayrollApp({ initialEmployees, initialEntries, initialDr
   // ---- employees ----
   function emptyEmp() { return { name: '', phone: '', hourlyRate: 0, status: 'Active' }; }
   async function saveEmp() {
-    if (!empModal.name.trim()) return alert('Employee name is required');
-    const method = empModal.id ? 'PUT' : 'POST';
-    const url = empModal.id ? `/api/employees/${empModal.id}` : '/api/employees';
-    const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(empModal) });
-    if (res.ok) { setEmpModal(null); await refreshAll(); }
+    if (!empModal.name.trim()) return toast.error('Employee name is required');
+    setSavingEmp(true);
+    try {
+      const method = empModal.id ? 'PUT' : 'POST';
+      const url = empModal.id ? `/api/employees/${empModal.id}` : '/api/employees';
+      const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(empModal) });
+      if (res.ok) {
+        toast.success(empModal.id ? 'Employee updated' : 'Employee added');
+        setEmpModal(null);
+        await refreshAll();
+      } else {
+        const d = await res.json().catch(() => ({}));
+        toast.error(d.error || 'Could not save employee');
+      }
+    } finally {
+      setSavingEmp(false);
+    }
   }
   async function delEmp(id) {
-    if (!confirm('Delete this employee? Past pay runs will keep their saved info.')) return;
-    await fetch(`/api/employees/${id}`, { method: 'DELETE' });
-    await refreshAll();
+    const ok = await confirmDialog('Delete this employee? Past pay runs will keep their saved info.', {
+      title: 'Delete employee',
+      confirmLabel: 'Delete Employee',
+      danger: true
+    });
+    if (!ok) return;
+    setBusyId(id);
+    try {
+      await fetch(`/api/employees/${id}`, { method: 'DELETE' });
+      toast.success('Employee deleted');
+      await refreshAll();
+    } finally {
+      setBusyId(null);
+    }
   }
 
   // ---- pay runs ----
@@ -99,32 +127,73 @@ export default function PayrollApp({ initialEmployees, initialEntries, initialDr
     setPayModal({ ...payModal, employeeId, hourlyRate: emp ? emp.hourly_rate : 0 });
   }
   async function savePay() {
-    if (!payModal.employeeId) return alert('Select an employee');
-    const method = payModal.id ? 'PUT' : 'POST';
-    const url = payModal.id ? `/api/payroll/${payModal.id}` : '/api/payroll';
-    const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payModal) });
-    if (res.ok) { setPayModal(null); await refreshAll(); }
-    else { const d = await res.json(); alert(d.error || 'Could not save pay run'); }
+    if (!payModal.employeeId) return toast.error('Select an employee');
+    setSavingPay(true);
+    try {
+      const method = payModal.id ? 'PUT' : 'POST';
+      const url = payModal.id ? `/api/payroll/${payModal.id}` : '/api/payroll';
+      const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payModal) });
+      if (res.ok) {
+        toast.success(payModal.id ? 'Pay run updated' : 'Pay run saved');
+        setPayModal(null);
+        await refreshAll();
+      } else {
+        const d = await res.json().catch(() => ({}));
+        toast.error(d.error || 'Could not save pay run');
+      }
+    } finally {
+      setSavingPay(false);
+    }
   }
   async function delPay(id) {
-    if (!confirm('Delete this pay run? This cannot be undone.')) return;
-    await fetch(`/api/payroll/${id}`, { method: 'DELETE' });
-    await refreshAll();
+    const ok = await confirmDialog('Delete this pay run? This cannot be undone.', {
+      title: 'Delete pay run',
+      confirmLabel: 'Delete Pay Run',
+      danger: true
+    });
+    if (!ok) return;
+    setBusyId(id);
+    try {
+      await fetch(`/api/payroll/${id}`, { method: 'DELETE' });
+      toast.success('Pay run deleted');
+      await refreshAll();
+    } finally {
+      setBusyId(null);
+    }
   }
 
   // ---- owner draws ----
   function emptyDraw() { return { date: today(), amount: 0, note: '' }; }
   async function saveDraw() {
-    if (!(Number(drawModal.amount) > 0)) return alert('Enter an amount greater than 0');
-    const method = drawModal.id ? 'PUT' : 'POST';
-    const url = drawModal.id ? `/api/draws/${drawModal.id}` : '/api/draws';
-    const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(drawModal) });
-    if (res.ok) { setDrawModal(null); await refreshAll(); }
+    if (!(Number(drawModal.amount) > 0)) return toast.error('Enter an amount greater than 0');
+    setSavingDraw(true);
+    try {
+      const method = drawModal.id ? 'PUT' : 'POST';
+      const url = drawModal.id ? `/api/draws/${drawModal.id}` : '/api/draws';
+      const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(drawModal) });
+      if (res.ok) {
+        toast.success(drawModal.id ? 'Draw updated' : 'Draw recorded');
+        setDrawModal(null);
+        await refreshAll();
+      } else {
+        const d = await res.json().catch(() => ({}));
+        toast.error(d.error || 'Could not save draw');
+      }
+    } finally {
+      setSavingDraw(false);
+    }
   }
   async function delDraw(id) {
-    if (!confirm('Delete this owner draw?')) return;
-    await fetch(`/api/draws/${id}`, { method: 'DELETE' });
-    await refreshAll();
+    const ok = await confirmDialog('Delete this owner draw?', { title: 'Delete draw', confirmLabel: 'Delete Draw', danger: true });
+    if (!ok) return;
+    setBusyId(id);
+    try {
+      await fetch(`/api/draws/${id}`, { method: 'DELETE' });
+      toast.success('Draw deleted');
+      await refreshAll();
+    } finally {
+      setBusyId(null);
+    }
   }
 
   const filteredEntries = entries.filter((e) => !payFilter || e.employee_id === payFilter);
@@ -157,6 +226,7 @@ export default function PayrollApp({ initialEmployees, initialEntries, initialDr
               <tbody>
                 {employees.map((e) => {
                   const ytd = entries.filter((p) => p.employee_id === e.id).reduce((s, p) => s + Number(p.net_pay), 0);
+                  const busy = busyId === e.id;
                   return (
                     <tr key={e.id}>
                       <td>{e.name}</td>
@@ -166,8 +236,8 @@ export default function PayrollApp({ initialEmployees, initialEntries, initialDr
                       <td className="num">{money(ytd)}</td>
                       <td>
                         <div className="row-actions">
-                          <button className="btn ghost sm" onClick={() => setEmpModal({ id: e.id, name: e.name, phone: e.phone || '', hourlyRate: e.hourly_rate, status: e.status })}>Edit</button>
-                          <button className="btn danger sm" onClick={() => delEmp(e.id)}>Delete</button>
+                          <button className="btn ghost sm" disabled={busy} onClick={() => setEmpModal({ id: e.id, name: e.name, phone: e.phone || '', hourlyRate: e.hourly_rate, status: e.status })}>Edit</button>
+                          <button className="btn danger sm" disabled={busy} onClick={() => delEmp(e.id)}>{busy ? 'Deleting…' : 'Delete'}</button>
                         </div>
                       </td>
                     </tr>
@@ -199,6 +269,7 @@ export default function PayrollApp({ initialEmployees, initialEntries, initialDr
                 {filteredEntries.map((e) => {
                   const totalReg = (e.allocations || []).reduce((s, a) => s + Number(a.reg_hours), 0);
                   const totalOt = (e.allocations || []).reduce((s, a) => s + Number(a.ot_hours), 0);
+                  const busy = busyId === e.id;
                   return (
                     <tr key={e.id}>
                       <td>{e.pay_number}</td>
@@ -210,8 +281,8 @@ export default function PayrollApp({ initialEmployees, initialEntries, initialDr
                       <td className="num" style={{ fontWeight: 700 }}>{money(e.net_pay)}</td>
                       <td>
                         <div className="row-actions">
-                          <button className="btn ghost sm" onClick={() => openEditPay(e)}>Edit</button>
-                          <button className="btn danger sm" onClick={() => delPay(e.id)}>Delete</button>
+                          <button className="btn ghost sm" disabled={busy} onClick={() => openEditPay(e)}>Edit</button>
+                          <button className="btn danger sm" disabled={busy} onClick={() => delPay(e.id)}>{busy ? 'Deleting…' : 'Delete'}</button>
                         </div>
                       </td>
                     </tr>
@@ -237,19 +308,22 @@ export default function PayrollApp({ initialEmployees, initialEntries, initialDr
             <table>
               <thead><tr><th>Date</th><th>Note</th><th className="num">Amount</th><th>Actions</th></tr></thead>
               <tbody>
-                {draws.map((d) => (
-                  <tr key={d.id}>
-                    <td>{fmtDate(d.date)}</td>
-                    <td>{d.note || '—'}</td>
-                    <td className="num" style={{ fontWeight: 700 }}>{money(d.amount)}</td>
-                    <td>
-                      <div className="row-actions">
-                        <button className="btn ghost sm" onClick={() => setDrawModal({ id: d.id, date: dstr(d.date), amount: d.amount, note: d.note || '' })}>Edit</button>
-                        <button className="btn danger sm" onClick={() => delDraw(d.id)}>Delete</button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {draws.map((d) => {
+                  const busy = busyId === d.id;
+                  return (
+                    <tr key={d.id}>
+                      <td>{fmtDate(d.date)}</td>
+                      <td>{d.note || '—'}</td>
+                      <td className="num" style={{ fontWeight: 700 }}>{money(d.amount)}</td>
+                      <td>
+                        <div className="row-actions">
+                          <button className="btn ghost sm" disabled={busy} onClick={() => setDrawModal({ id: d.id, date: dstr(d.date), amount: d.amount, note: d.note || '' })}>Edit</button>
+                          <button className="btn danger sm" disabled={busy} onClick={() => delDraw(d.id)}>{busy ? 'Deleting…' : 'Delete'}</button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
             {draws.length === 0 && <div className="empty">No owner draws logged yet.</div>}
@@ -273,8 +347,8 @@ export default function PayrollApp({ initialEmployees, initialEntries, initialDr
               </select>
             </div>
             <div className="modal-actions">
-              <button className="btn ghost" onClick={() => setEmpModal(null)}>Cancel</button>
-              <button className="btn amber" onClick={saveEmp}>Save Employee</button>
+              <button className="btn ghost" disabled={savingEmp} onClick={() => setEmpModal(null)}>Cancel</button>
+              <button className="btn amber" disabled={savingEmp} onClick={saveEmp}>{savingEmp ? 'Saving…' : 'Save Employee'}</button>
             </div>
           </div>
         </div>
@@ -346,8 +420,8 @@ export default function PayrollApp({ initialEmployees, initialEntries, initialDr
             <div className="field"><label>Notes</label><textarea rows={2} value={payModal.notes} onChange={(e) => setPayModal({ ...payModal, notes: e.target.value })} /></div>
 
             <div className="modal-actions">
-              <button className="btn ghost" onClick={() => setPayModal(null)}>Cancel</button>
-              <button className="btn amber" onClick={savePay}>Save Pay Run</button>
+              <button className="btn ghost" disabled={savingPay} onClick={() => setPayModal(null)}>Cancel</button>
+              <button className="btn amber" disabled={savingPay} onClick={savePay}>{savingPay ? 'Saving…' : 'Save Pay Run'}</button>
             </div>
           </div>
         </div>
@@ -363,8 +437,8 @@ export default function PayrollApp({ initialEmployees, initialEntries, initialDr
             </div>
             <div className="field"><label>Note</label><input value={drawModal.note} onChange={(e) => setDrawModal({ ...drawModal, note: e.target.value })} placeholder="e.g. June owner distribution" /></div>
             <div className="modal-actions">
-              <button className="btn ghost" onClick={() => setDrawModal(null)}>Cancel</button>
-              <button className="btn amber" onClick={saveDraw}>Save Draw</button>
+              <button className="btn ghost" disabled={savingDraw} onClick={() => setDrawModal(null)}>Cancel</button>
+              <button className="btn amber" disabled={savingDraw} onClick={saveDraw}>{savingDraw ? 'Saving…' : 'Save Draw'}</button>
             </div>
           </div>
         </div>

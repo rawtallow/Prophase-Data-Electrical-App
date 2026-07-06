@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { toast, confirmDialog } from '../ui-feedback';
 
 function money(n) {
   return '$' + (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -12,6 +13,8 @@ export default function PartsApp({ initialParts, canManage }) {
   const [parts, setParts] = useState(initialParts);
   const [search, setSearch] = useState('');
   const [modal, setModal] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [busyId, setBusyId] = useState(null);
 
   async function refresh() {
     const rows = await fetch('/api/parts').then((r) => r.json());
@@ -30,20 +33,44 @@ export default function PartsApp({ initialParts, canManage }) {
   }
 
   async function save() {
-    if (!modal.name.trim()) return alert('Part name is required');
-    const method = modal.id ? 'PUT' : 'POST';
-    const url = modal.id ? `/api/parts/${modal.id}` : '/api/parts';
-    const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(modal) });
-    if (res.ok) { setModal(null); await refresh(); }
+    if (!modal.name.trim()) return toast.error('Part name is required');
+    setSaving(true);
+    try {
+      const method = modal.id ? 'PUT' : 'POST';
+      const url = modal.id ? `/api/parts/${modal.id}` : '/api/parts';
+      const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(modal) });
+      if (res.ok) {
+        toast.success(modal.id ? 'Part updated' : 'Part added');
+        setModal(null);
+        await refresh();
+      } else {
+        const d = await res.json().catch(() => ({}));
+        toast.error(d.error || 'Could not save part');
+      }
+    } finally {
+      setSaving(false);
+    }
   }
   async function del(id) {
-    if (!confirm('Delete this part from inventory?')) return;
-    await fetch(`/api/parts/${id}`, { method: 'DELETE' });
-    await refresh();
+    const ok = await confirmDialog('Delete this part from inventory?', { title: 'Delete part', confirmLabel: 'Delete Part', danger: true });
+    if (!ok) return;
+    setBusyId(id);
+    try {
+      await fetch(`/api/parts/${id}`, { method: 'DELETE' });
+      toast.success('Part deleted');
+      await refresh();
+    } finally {
+      setBusyId(null);
+    }
   }
   async function adjust(id, delta) {
-    await fetch(`/api/parts/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ delta }) });
-    await refresh();
+    setBusyId(id);
+    try {
+      await fetch(`/api/parts/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ delta }) });
+      await refresh();
+    } finally {
+      setBusyId(null);
+    }
   }
 
   const list = parts.filter((p) => {
@@ -80,6 +107,7 @@ export default function PartsApp({ initialParts, canManage }) {
           <tbody>
             {list.map((p) => {
               const low = isLow(p);
+              const busy = busyId === p.id;
               return (
                 <tr key={p.id}>
                   <td>{p.name}</td>
@@ -92,10 +120,10 @@ export default function PartsApp({ initialParts, canManage }) {
                   <td><span className={`badge ${low ? 'lowstock' : 'instock'}`}>{low ? 'Low Stock' : 'OK'}</span></td>
                   <td>
                     <div className="row-actions">
-                      <button className="btn ghost sm" onClick={() => adjust(p.id, -1)}>-1</button>
-                      <button className="btn ghost sm" onClick={() => adjust(p.id, 1)}>+1</button>
-                      {canManage && <button className="btn ghost sm" onClick={() => openEdit(p)}>Edit</button>}
-                      {canManage && <button className="btn danger sm" onClick={() => del(p.id)}>Delete</button>}
+                      <button className="btn ghost sm" disabled={busy} onClick={() => adjust(p.id, -1)}>-1</button>
+                      <button className="btn ghost sm" disabled={busy} onClick={() => adjust(p.id, 1)}>+1</button>
+                      {canManage && <button className="btn ghost sm" disabled={busy} onClick={() => openEdit(p)}>Edit</button>}
+                      {canManage && <button className="btn danger sm" disabled={busy} onClick={() => del(p.id)}>{busy ? '…' : 'Delete'}</button>}
                     </div>
                   </td>
                 </tr>
@@ -125,8 +153,8 @@ export default function PartsApp({ initialParts, canManage }) {
             </div>
             <div className="field"><label>Notes</label><textarea rows={2} value={modal.notes} onChange={(e) => setModal({ ...modal, notes: e.target.value })} /></div>
             <div className="modal-actions">
-              <button className="btn ghost" onClick={() => setModal(null)}>Cancel</button>
-              <button className="btn amber" onClick={save}>Save Part</button>
+              <button className="btn ghost" disabled={saving} onClick={() => setModal(null)}>Cancel</button>
+              <button className="btn amber" disabled={saving} onClick={save}>{saving ? 'Saving…' : 'Save Part'}</button>
             </div>
           </div>
         </div>

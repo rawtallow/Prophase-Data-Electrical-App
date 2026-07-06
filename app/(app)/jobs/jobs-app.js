@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { toast, confirmDialog } from '../ui-feedback';
 
 function money(n) {
   return '$' + (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -14,6 +15,8 @@ export default function JobsApp({ initialJobs, clients, laborByJob, fullAccess, 
   const [statusFilter, setStatusFilter] = useState('');
   const [search, setSearch] = useState('');
   const [modal, setModal] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [busyId, setBusyId] = useState(null);
 
   async function refresh() {
     const rows = await fetch('/api/jobs').then((r) => r.json());
@@ -40,27 +43,44 @@ export default function JobsApp({ initialJobs, clients, laborByJob, fullAccess, 
   }
 
   async function save() {
-    if (!modal.clientName.trim()) return alert('Client name is required');
-    const method = modal.id ? 'PUT' : 'POST';
-    const url = modal.id ? `/api/jobs/${modal.id}` : '/api/jobs';
-    const res = await fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(modal)
-    });
-    if (res.ok) {
-      setModal(null);
-      await refresh();
-    } else {
-      const d = await res.json();
-      alert(d.error || 'Could not save job');
+    if (!modal.clientName.trim()) return toast.error('Client name is required');
+    setSaving(true);
+    try {
+      const method = modal.id ? 'PUT' : 'POST';
+      const url = modal.id ? `/api/jobs/${modal.id}` : '/api/jobs';
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(modal)
+      });
+      if (res.ok) {
+        toast.success(modal.id ? 'Job updated' : 'Job created');
+        setModal(null);
+        await refresh();
+      } else {
+        const d = await res.json();
+        toast.error(d.error || 'Could not save job');
+      }
+    } finally {
+      setSaving(false);
     }
   }
 
   async function del(id) {
-    if (!confirm('Delete this job? This cannot be undone.')) return;
-    await fetch(`/api/jobs/${id}`, { method: 'DELETE' });
-    await refresh();
+    const ok = await confirmDialog('Delete this job? This cannot be undone.', {
+      title: 'Delete job',
+      confirmLabel: 'Delete Job',
+      danger: true
+    });
+    if (!ok) return;
+    setBusyId(id);
+    try {
+      await fetch(`/api/jobs/${id}`, { method: 'DELETE' });
+      toast.success('Job deleted');
+      await refresh();
+    } finally {
+      setBusyId(null);
+    }
   }
 
   const list = jobs.filter((j) => {
@@ -99,6 +119,7 @@ export default function JobsApp({ initialJobs, clients, laborByJob, fullAccess, 
               const balance = Number(j.amount_invoiced) - Number(j.amount_paid);
               const labor = laborByJob[j.id] || 0;
               const margin = Number(j.amount_invoiced) - labor;
+              const busy = busyId === j.id;
               return (
                 <tr key={j.id}>
                   <td>{j.job_number}</td>
@@ -117,8 +138,8 @@ export default function JobsApp({ initialJobs, clients, laborByJob, fullAccess, 
                   )}
                   <td>
                     <div className="row-actions">
-                      <button className="btn ghost sm" onClick={() => openEdit(j)}>Edit</button>
-                      {canManageJobs && <button className="btn danger sm" onClick={() => del(j.id)}>Delete</button>}
+                      <button className="btn ghost sm" disabled={busy} onClick={() => openEdit(j)}>Edit</button>
+                      {canManageJobs && <button className="btn danger sm" disabled={busy} onClick={() => del(j.id)}>{busy ? 'Deleting…' : 'Delete'}</button>}
                     </div>
                   </td>
                 </tr>
@@ -173,8 +194,8 @@ export default function JobsApp({ initialJobs, clients, laborByJob, fullAccess, 
               <textarea rows={2} value={modal.notes} onChange={(e) => setModal({ ...modal, notes: e.target.value })} />
             </div>
             <div className="modal-actions">
-              <button className="btn ghost" onClick={() => setModal(null)}>Cancel</button>
-              <button className="btn amber" onClick={save}>Save Job</button>
+              <button className="btn ghost" disabled={saving} onClick={() => setModal(null)}>Cancel</button>
+              <button className="btn amber" disabled={saving} onClick={save}>{saving ? 'Saving…' : 'Save Job'}</button>
             </div>
           </div>
         </div>

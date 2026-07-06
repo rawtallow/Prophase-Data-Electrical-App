@@ -2,6 +2,7 @@ import { getSession, CAN } from '../../lib/auth';
 import { redirect } from 'next/navigation';
 import NavLinks from './nav-links';
 import LogoutButton from './logout-button';
+import { FeedbackHost } from './ui-feedback';
 
 export default async function AppLayout({ children }) {
   const session = await getSession();
@@ -25,6 +26,7 @@ export default async function AppLayout({ children }) {
       </header>
       <NavLinks role={session.role} />
       <main className="container">{children}</main>
+      <FeedbackHost />
     </>
   );
 }

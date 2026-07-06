@@ -1,15 +1,17 @@
 'use client';
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { toast, confirmDialog } from '../ui-feedback';
 
 export default function ClientsApp({ initialClients, initialAssets, canManage }) {
-  const router = useRouter();
   const [clients, setClients] = useState(initialClients);
   const [assets, setAssets] = useState(initialAssets);
 
   const [clientModal, setClientModal] = useState(null); // null | {} | {id,...}
   const [assetModal, setAssetModal] = useState(null); // null | { client, editingAsset }
   const [assetForm, setAssetForm] = useState(emptyAsset());
+  const [savingClient, setSavingClient] = useState(false);
+  const [savingAsset, setSavingAsset] = useState(false);
+  const [busyId, setBusyId] = useState(null);
 
   function emptyAsset() {
     return { name: '', model: '', serial: '', installDate: '', warrantyExpiry: '', notes: '' };
@@ -25,23 +27,43 @@ export default function ClientsApp({ initialClients, initialAssets, canManage })
   }
 
   async function saveClient(form) {
-    const method = form.id ? 'PUT' : 'POST';
-    const url = form.id ? `/api/clients/${form.id}` : '/api/clients';
-    const res = await fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form)
-    });
-    if (res.ok) {
-      setClientModal(null);
-      await refresh();
+    setSavingClient(true);
+    try {
+      const method = form.id ? 'PUT' : 'POST';
+      const url = form.id ? `/api/clients/${form.id}` : '/api/clients';
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form)
+      });
+      if (res.ok) {
+        setClientModal(null);
+        toast.success(form.id ? 'Client updated' : 'Client added');
+        await refresh();
+      } else {
+        const d = await res.json().catch(() => ({}));
+        toast.error(d.error || 'Could not save client');
+      }
+    } finally {
+      setSavingClient(false);
     }
   }
 
   async function deleteClient(id) {
-    if (!confirm('Delete this client? Existing quotes and jobs will keep their saved info.')) return;
-    await fetch(`/api/clients/${id}`, { method: 'DELETE' });
-    await refresh();
+    const ok = await confirmDialog('Delete this client? Existing quotes and jobs will keep their saved info.', {
+      title: 'Delete client',
+      confirmLabel: 'Delete Client',
+      danger: true
+    });
+    if (!ok) return;
+    setBusyId(id);
+    try {
+      await fetch(`/api/clients/${id}`, { method: 'DELETE' });
+      toast.success('Client deleted');
+      await refresh();
+    } finally {
+      setBusyId(null);
+    }
   }
 
   function openAssets(client) {
@@ -50,24 +72,40 @@ export default function ClientsApp({ initialClients, initialAssets, canManage })
   }
 
   async function saveAsset() {
-    if (!assetForm.name.trim()) return alert('Asset name / type is required');
-    const method = assetForm.id ? 'PUT' : 'POST';
-    const url = assetForm.id ? `/api/assets/${assetForm.id}` : '/api/assets';
-    const res = await fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...assetForm, clientId: assetModal.client.id })
-    });
-    if (res.ok) {
-      setAssetForm(emptyAsset());
-      await refresh();
+    if (!assetForm.name.trim()) return toast.error('Asset name / type is required');
+    setSavingAsset(true);
+    try {
+      const method = assetForm.id ? 'PUT' : 'POST';
+      const url = assetForm.id ? `/api/assets/${assetForm.id}` : '/api/assets';
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...assetForm, clientId: assetModal.client.id })
+      });
+      if (res.ok) {
+        setAssetForm(emptyAsset());
+        toast.success('Asset saved');
+        await refresh();
+      } else {
+        const d = await res.json().catch(() => ({}));
+        toast.error(d.error || 'Could not save asset');
+      }
+    } finally {
+      setSavingAsset(false);
     }
   }
 
   async function deleteAsset(id) {
-    if (!confirm('Delete this asset record?')) return;
-    await fetch(`/api/assets/${id}`, { method: 'DELETE' });
-    await refresh();
+    const ok = await confirmDialog('Delete this asset record?', { title: 'Delete asset', confirmLabel: 'Delete Asset', danger: true });
+    if (!ok) return;
+    setBusyId(id);
+    try {
+      await fetch(`/api/assets/${id}`, { method: 'DELETE' });
+      toast.success('Asset deleted');
+      await refresh();
+    } finally {
+      setBusyId(null);
+    }
   }
 
   function editAsset(a) {
@@ -113,13 +151,15 @@ export default function ClientsApp({ initialClients, initialAssets, canManage })
                 <td>
                   <div className="row-actions">
                     {canManage && (
-                      <button className="btn ghost sm" onClick={() => setClientModal({ id: c.id, name: c.name, phone: c.phone, email: c.email, address: c.address })}>
+                      <button className="btn ghost sm" disabled={busyId === c.id} onClick={() => setClientModal({ id: c.id, name: c.name, phone: c.phone, email: c.email, address: c.address })}>
                         Edit
                       </button>
                     )}
-                    <button className="btn ghost sm" onClick={() => openAssets(c)}>Assets</button>
+                    <button className="btn ghost sm" disabled={busyId === c.id} onClick={() => openAssets(c)}>Assets</button>
                     {canManage && (
-                      <button className="btn danger sm" onClick={() => deleteClient(c.id)}>Delete</button>
+                      <button className="btn danger sm" disabled={busyId === c.id} onClick={() => deleteClient(c.id)}>
+                        {busyId === c.id ? 'Deleting…' : 'Delete'}
+                      </button>
                     )}
                   </div>
                 </td>
@@ -153,8 +193,10 @@ export default function ClientsApp({ initialClients, initialAssets, canManage })
               <input value={clientModal.address || ''} onChange={(e) => setClientModal({ ...clientModal, address: e.target.value })} />
             </div>
             <div className="modal-actions">
-              <button className="btn ghost" onClick={() => setClientModal(null)}>Cancel</button>
-              <button className="btn amber" onClick={() => saveClient(clientModal)}>Save Client</button>
+              <button className="btn ghost" disabled={savingClient} onClick={() => setClientModal(null)}>Cancel</button>
+              <button className="btn amber" disabled={savingClient} onClick={() => saveClient(clientModal)}>
+                {savingClient ? 'Saving…' : 'Save Client'}
+              </button>
             </div>
           </div>
         </div>
@@ -195,8 +237,8 @@ export default function ClientsApp({ initialClients, initialAssets, canManage })
                   <textarea rows={2} value={assetForm.notes} onChange={(e) => setAssetForm({ ...assetForm, notes: e.target.value })} />
                 </div>
                 <div className="footer-actions">
-                  <button className="btn ghost sm" onClick={() => setAssetForm(emptyAsset())}>Clear / New Asset</button>
-                  <button className="btn amber sm" onClick={saveAsset}>Save Asset</button>
+                  <button className="btn ghost sm" disabled={savingAsset} onClick={() => setAssetForm(emptyAsset())}>Clear / New Asset</button>
+                  <button className="btn amber sm" disabled={savingAsset} onClick={saveAsset}>{savingAsset ? 'Saving…' : 'Save Asset'}</button>
                 </div>
               </>
             )}
@@ -215,8 +257,10 @@ export default function ClientsApp({ initialClients, initialAssets, canManage })
                     {canManage && (
                       <td>
                         <div className="row-actions">
-                          <button className="btn ghost sm" onClick={() => editAsset(a)}>Edit</button>
-                          <button className="btn danger sm" onClick={() => deleteAsset(a.id)}>Delete</button>
+                          <button className="btn ghost sm" disabled={busyId === a.id} onClick={() => editAsset(a)}>Edit</button>
+                          <button className="btn danger sm" disabled={busyId === a.id} onClick={() => deleteAsset(a.id)}>
+                            {busyId === a.id ? 'Deleting…' : 'Delete'}
+                          </button>
                         </div>
                       </td>
                     )}

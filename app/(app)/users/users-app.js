@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { toast, confirmDialog } from '../ui-feedback';
 
 function fmtDate(d) {
   return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -9,6 +10,8 @@ export default function UsersApp({ initialUsers, myId }) {
   const [users, setUsers] = useState(initialUsers);
   const [modal, setModal] = useState(null); // {id?, name, email, role, active, password?, newPassword?}
   const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [busyId, setBusyId] = useState(null);
 
   async function refresh() {
     const rows = await fetch('/api/users').then((r) => r.json());
@@ -20,20 +23,41 @@ export default function UsersApp({ initialUsers, myId }) {
 
   async function save() {
     setError('');
-    const method = modal.id ? 'PUT' : 'POST';
-    const url = modal.id ? `/api/users/${modal.id}` : '/api/users';
-    const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(modal) });
-    const data = await res.json();
-    if (!res.ok) { setError(data.error || 'Could not save user'); return; }
-    setModal(null);
-    await refresh();
+    setSaving(true);
+    try {
+      const method = modal.id ? 'PUT' : 'POST';
+      const url = modal.id ? `/api/users/${modal.id}` : '/api/users';
+      const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(modal) });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error || 'Could not save user'); return; }
+      toast.success(modal.id ? 'Account updated' : 'Account created');
+      setModal(null);
+      await refresh();
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function del(id) {
-    if (!confirm('Delete this account? They will no longer be able to log in.')) return;
-    const res = await fetch(`/api/users/${id}`, { method: 'DELETE' });
-    if (res.ok) await refresh();
-    else { const d = await res.json(); alert(d.error); }
+    const ok = await confirmDialog('Delete this account? They will no longer be able to log in.', {
+      title: 'Delete account',
+      confirmLabel: 'Delete Account',
+      danger: true
+    });
+    if (!ok) return;
+    setBusyId(id);
+    try {
+      const res = await fetch(`/api/users/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        toast.success('Account deleted');
+        await refresh();
+      } else {
+        const d = await res.json();
+        toast.error(d.error || 'Could not delete account');
+      }
+    } finally {
+      setBusyId(null);
+    }
   }
 
   return (
@@ -59,8 +83,12 @@ export default function UsersApp({ initialUsers, myId }) {
                 <td>{fmtDate(u.created_at)}</td>
                 <td>
                   <div className="row-actions">
-                    <button className="btn ghost sm" onClick={() => openEdit(u)}>Edit</button>
-                    {u.id !== myId && <button className="btn danger sm" onClick={() => del(u.id)}>Delete</button>}
+                    <button className="btn ghost sm" disabled={busyId === u.id} onClick={() => openEdit(u)}>Edit</button>
+                    {u.id !== myId && (
+                      <button className="btn danger sm" disabled={busyId === u.id} onClick={() => del(u.id)}>
+                        {busyId === u.id ? 'Deleting…' : 'Delete'}
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -106,8 +134,10 @@ export default function UsersApp({ initialUsers, myId }) {
               </div>
             )}
             <div className="modal-actions">
-              <button className="btn ghost" onClick={() => setModal(null)}>Cancel</button>
-              <button className="btn amber" onClick={save}>{modal.id ? 'Save Changes' : 'Create Account'}</button>
+              <button className="btn ghost" disabled={saving} onClick={() => setModal(null)}>Cancel</button>
+              <button className="btn amber" disabled={saving} onClick={save}>
+                {saving ? 'Saving…' : modal.id ? 'Save Changes' : 'Create Account'}
+              </button>
             </div>
           </div>
         </div>

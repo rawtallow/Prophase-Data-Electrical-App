@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { toast } from '../ui-feedback';
 
 function money(n) {
   return '$' + (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -49,7 +50,7 @@ export default function QuoteForm({ existing, clients }) {
   const total = taxable + tax;
 
   async function save() {
-    if (!form.clientName.trim()) return alert('Customer name is required');
+    if (!form.clientName.trim()) return toast.error('Customer name is required');
     setSaving(true);
     const method = form.id ? 'PUT' : 'POST';
     const url = form.id ? `/api/quotes/${form.id}` : '/api/quotes';
@@ -60,11 +61,12 @@ export default function QuoteForm({ existing, clients }) {
     });
     setSaving(false);
     if (res.ok) {
+      toast.success(form.id ? 'Quote updated' : 'Quote created');
       router.push('/quotes');
       router.refresh();
     } else {
       const d = await res.json();
-      alert(d.error || 'Could not save quote');
+      toast.error(d.error || 'Could not save quote');
     }
   }
 

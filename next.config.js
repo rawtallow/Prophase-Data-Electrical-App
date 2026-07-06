@@ -4,12 +4,20 @@
 // 'unsafe-inline' because Next.js App Router injects inline bootstrap
 // scripts; the CSP still blocks external script hosts, framing, plugins,
 // and non-self connections.
+//
+// 'unsafe-eval' is added to script-src ONLY outside production: Next.js dev
+// mode's webpack devtool (eval-source-map) wraps every module in eval() to
+// support fast rebuilds, and a strict CSP silently blocks that, which kills
+// hydration in `next dev` with no console error. The production build
+// (what Vercel actually serves) never calls eval(), so prod keeps the
+// stricter policy.
+const scriptSrc = process.env.NODE_ENV === 'production' ? "'self' 'unsafe-inline'" : "'self' 'unsafe-inline' 'unsafe-eval'";
 const securityHeaders = [
   {
     key: 'Content-Security-Policy',
     value: [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline'",
+      `script-src ${scriptSrc}`,
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob:",
       "font-src 'self'",

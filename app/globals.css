@@ -188,3 +188,65 @@ tr:hover td { background: #fafbfc; }
 .print-meta .qnum { font-size: 18px; font-weight: 700; color: var(--navy); }
 .bill-to { margin-bottom: 18px; }
 .bill-to .lbl { font-size: 11px; text-transform: uppercase; color: var(--text-mute); font-weight: 700; margin-bottom: 4px; }
+
+/* ---- Motion & depth ----
+   Everything below is additive polish: subtle transitions on interactive
+   elements, resting shadows for depth, animated modal/toast entry, and a
+   tactile button press. Scoped to specific selectors (not a global *
+   transition) so layout-affecting changes like table sorting don't lag. */
+.btn, .tabs a, .subtabs a, input, select, textarea, .card, td, .badge {
+  transition: background-color .15s ease, border-color .15s ease, color .15s ease,
+              box-shadow .15s ease, transform .1s ease;
+}
+.btn:active:not(:disabled) { transform: scale(0.97); }
+.btn { box-shadow: 0 1px 2px rgba(10,10,10,0.06); }
+.btn.amber { box-shadow: 0 1px 2px rgba(245,166,35,0.3); }
+.btn.amber:hover:not(:disabled) { box-shadow: 0 2px 8px rgba(245,166,35,0.4); }
+.btn.ghost { box-shadow: none; }
+
+.card, .panel { box-shadow: 0 1px 3px rgba(16,24,32,0.06); }
+.app-header { box-shadow: 0 1px 3px rgba(16,24,32,0.05); }
+
+input:focus, select:focus, textarea:focus {
+  box-shadow: 0 0 0 3px rgba(245,166,35,0.18);
+}
+
+.tabs a, .subtabs a { transition: color .15s ease, border-bottom-color .18s ease; }
+
+.modal-overlay.active { animation: overlayIn .15s ease; }
+.modal { animation: modalIn .18s cubic-bezier(0.16, 1, 0.3, 1); }
+@keyframes overlayIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes modalIn {
+  from { opacity: 0; transform: translateY(10px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.toast-stack {
+  position: fixed; top: 18px; right: 18px; z-index: 200;
+  display: flex; flex-direction: column; gap: 8px; max-width: 340px;
+}
+.toast {
+  background: #1c2733; color: #fff; padding: 12px 16px; border-radius: 8px;
+  font-size: 13.5px; font-weight: 600; box-shadow: 0 6px 20px rgba(10,10,10,0.28);
+  border-left: 4px solid var(--amber);
+  animation: toastIn .2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.toast-success { border-left-color: var(--green); }
+.toast-error { border-left-color: var(--red); }
+.toast-info { border-left-color: var(--blue); }
+@keyframes toastIn {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.confirm-message { color: var(--text); font-size: 14px; line-height: 1.5; margin: 0 0 4px; }
+.btn.danger-solid { background: var(--red); color: #fff; }
+.btn.danger-solid:hover:not(:disabled) { background: #a5311f; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
