@@ -28,9 +28,8 @@ export async function GET() {
 
 export async function POST(req) {
   const session = await getSession();
-  if (!session || !CAN.editQuotes(session.role)) {
-    return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
-  }
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
   const body = await req.json();
   const { clientId, clientName, clientPhone, clientEmail, clientAddress, jobDescription, lineItems, taxRate, discount, status, notes } = body;
 
@@ -41,11 +40,19 @@ export async function POST(req) {
   const { subtotal, tax, total } = computeTotals(cleanItems, taxRate, discount);
   const quoteNumber = await nextQuoteNumber();
 
+  // Employees can draft, but their quotes need manager/admin sign-off
+  // before they can be sent — a manager/admin's own quote is auto-approved
+  // since they already have full authority over quotes.
+  const isEmployee = session.role === 'employee';
+  const finalStatus = isEmployee ? 'Draft' : (status || 'Draft');
+  const approvalStatus = isEmployee ? 'Pending Approval' : 'Approved';
+
   const rows = await sql`
     insert into quotes (quote_number, client_id, client_name, client_phone, client_email, client_address, job_description,
-      tax_rate, discount, subtotal, tax, total, status, notes)
+      tax_rate, discount, subtotal, tax, total, status, notes, approval_status, created_by_id, created_by)
     values (${quoteNumber}, ${clientId || null}, ${clientName.trim()}, ${clientPhone || ''}, ${clientEmail || ''}, ${clientAddress || ''},
-      ${jobDescription || ''}, ${Number(taxRate) || 0}, ${Number(discount) || 0}, ${subtotal}, ${tax}, ${total}, ${status || 'Draft'}, ${notes || ''})
+      ${jobDescription || ''}, ${Number(taxRate) || 0}, ${Number(discount) || 0}, ${subtotal}, ${tax}, ${total}, ${finalStatus}, ${notes || ''},
+      ${approvalStatus}, ${session.id}, ${session.name})
     returning *
   `;
   const quote = rows[0];

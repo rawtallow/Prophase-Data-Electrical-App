@@ -8,8 +8,8 @@ export default function NavLinks({ role }) {
 
   const items = [
     { href: '/dashboard', label: 'Dashboard', show: true },
-    { href: '/quotes/new', label: 'New Quote', show: fullAccess },
-    { href: '/quotes', label: 'Quotes', show: fullAccess },
+    { href: '/quotes/new', label: 'New Quote', show: true },
+    { href: '/quotes', label: 'Quotes', show: true },
     { href: '/jobs', label: 'Job Log', show: true },
     { href: '/payroll', label: 'Payroll', show: fullAccess },
     { href: '/parts', label: 'Spare Parts', show: true },

@@ -52,9 +52,11 @@ export async function POST(req) {
   for (const q of data.quotes) {
     queries.push(sql`
       insert into quotes (id, quote_number, date, client_id, client_name, client_phone, client_email, client_address,
-        job_description, tax_rate, discount, subtotal, tax, total, status, notes, created_at)
+        job_description, tax_rate, discount, subtotal, tax, total, status, notes, created_at,
+        approval_status, created_by_id, created_by, approval_note, reviewed_by)
       values (${q.id}, ${q.quote_number}, ${q.date}, ${q.client_id}, ${q.client_name}, ${q.client_phone}, ${q.client_email},
-        ${q.client_address}, ${q.job_description}, ${q.tax_rate}, ${q.discount}, ${q.subtotal}, ${q.tax}, ${q.total}, ${q.status}, ${q.notes}, ${q.created_at})
+        ${q.client_address}, ${q.job_description}, ${q.tax_rate}, ${q.discount}, ${q.subtotal}, ${q.tax}, ${q.total}, ${q.status}, ${q.notes}, ${q.created_at},
+        ${q.approval_status || 'Approved'}, ${q.created_by_id || null}, ${q.created_by || ''}, ${q.approval_note || ''}, ${q.reviewed_by || ''})
     `);
   }
   for (const a of data.assets) {

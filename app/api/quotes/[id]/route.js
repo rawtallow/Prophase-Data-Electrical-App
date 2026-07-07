@@ -23,7 +23,21 @@ export async function GET(req, { params }) {
 
 export async function PUT(req, { params }) {
   const session = await getSession();
-  if (!session || !CAN.editQuotes(session.role)) return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  const existingRows = await sql`select * from quotes where id = ${params.id}`;
+  const existing = existingRows[0];
+  if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+  const isEmployee = session.role === 'employee';
+  if (isEmployee) {
+    if (existing.created_by_id !== session.id) {
+      return NextResponse.json({ error: 'You can only edit your own quotes' }, { status: 403 });
+    }
+    if (existing.approval_status === 'Approved') {
+      return NextResponse.json({ error: 'This quote has already been approved and can no longer be edited' }, { status: 403 });
+    }
+  }
 
   const body = await req.json();
   const { clientId, clientName, clientPhone, clientEmail, clientAddress, jobDescription, lineItems, taxRate, discount, status, notes } = body;
@@ -32,12 +46,29 @@ export async function PUT(req, { params }) {
 
   const { subtotal, tax, total } = computeTotals(cleanItems, taxRate, discount);
 
+  let finalStatus = status;
+  let finalApprovalStatus = existing.approval_status;
+  let finalApprovalNote = existing.approval_note;
+  let finalReviewedBy = existing.reviewed_by;
+  if (isEmployee) {
+    // Any employee edit (including fixing up a rejected quote) goes back
+    // into the review queue — they can't set status themselves, and a
+    // resubmission clears the previous review so it doesn't look stale.
+    finalStatus = 'Draft';
+    finalApprovalStatus = 'Pending Approval';
+    finalApprovalNote = '';
+    finalReviewedBy = '';
+  } else if (['Sent', 'Accepted', 'Declined'].includes(status) && existing.approval_status !== 'Approved') {
+    return NextResponse.json({ error: 'Approve this quote before it can be sent' }, { status: 400 });
+  }
+
   const rows = await sql`
     update quotes set
       client_id = ${clientId || null}, client_name = ${clientName}, client_phone = ${clientPhone || ''},
       client_email = ${clientEmail || ''}, client_address = ${clientAddress || ''}, job_description = ${jobDescription || ''},
       tax_rate = ${Number(taxRate) || 0}, discount = ${Number(discount) || 0}, subtotal = ${subtotal}, tax = ${tax}, total = ${total},
-      status = ${status}, notes = ${notes || ''}
+      status = ${finalStatus}, notes = ${notes || ''},
+      approval_status = ${finalApprovalStatus}, approval_note = ${finalApprovalNote}, reviewed_by = ${finalReviewedBy}
     where id = ${params.id}
     returning *
   `;
@@ -56,7 +87,20 @@ export async function PUT(req, { params }) {
 
 export async function DELETE(req, { params }) {
   const session = await getSession();
-  if (!session || !CAN.editQuotes(session.role)) return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  if (CAN.editQuotes(session.role)) {
+    await sql`delete from quotes where id = ${params.id}`;
+    return NextResponse.json({ ok: true });
+  }
+
+  // Employees can only remove their own quote while it's still awaiting
+  // (or was sent back for) review — not once it's been approved.
+  const rows = await sql`select created_by_id, approval_status from quotes where id = ${params.id}`;
+  const existing = rows[0];
+  if (!existing || existing.created_by_id !== session.id || existing.approval_status === 'Approved') {
+    return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
+  }
   await sql`delete from quotes where id = ${params.id}`;
   return NextResponse.json({ ok: true });
 }

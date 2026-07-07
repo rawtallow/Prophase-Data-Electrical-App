@@ -1,15 +1,32 @@
 import { sql } from '../../../../../lib/db';
-import { notFound } from 'next/navigation';
+import { getSession, CAN } from '../../../../../lib/auth';
+import { notFound, redirect } from 'next/navigation';
 import PrintButton from './print-button';
 import { money, toDisplayDate as dstr } from '../../../../../lib/format';
 
 export default async function PrintQuotePage({ params }) {
+  const session = await getSession();
+  // Middleware already blocks employees from this route; this is the
+  // second line of defense plus the actual business rule — nobody can
+  // print/send a quote (even a manager) until it's been approved.
+  if (!CAN.editQuotes(session.role)) redirect('/quotes?denied=1');
+
   const [quotes, lineItems] = await Promise.all([
     sql`select * from quotes where id = ${params.id}`,
     sql`select * from quote_line_items where quote_id = ${params.id} order by sort_order asc`
   ]);
   const q = quotes[0];
   if (!q) notFound();
+  if (q.approval_status !== 'Approved') {
+    return (
+      <div style={{ maxWidth: 480, margin: '60px auto', textAlign: 'center' }}>
+        <h2 className="section-title">Not approved yet</h2>
+        <p className="small-note">
+          Quote {q.quote_number} must be approved before it can be printed or sent to the customer.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div style={{ maxWidth: 760, margin: '0 auto' }}>

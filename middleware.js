@@ -5,11 +5,12 @@ import { verifyToken, COOKIE } from './lib/jwt';
 const PUBLIC_PATHS = ['/login', '/setup', '/api/auth/login', '/api/setup'];
 
 // Paths that require admin or manager (i.e. NOT a plain employee).
+// Quotes are deliberately NOT here — employees can now draft/view quotes;
+// the employee-vs-manager distinction there is ownership/approval-state
+// based (enforced in the API routes and page.js files), not a flat role gate.
 const FULL_ACCESS_PREFIXES = [
-  '/quotes',
   '/payroll',
   '/backup',
-  '/api/quotes',
   '/api/payroll',
   '/api/draws',
   '/api/employees',
@@ -24,6 +25,12 @@ function isPublic(pathname) {
 }
 function matches(pathname, prefixes) {
   return prefixes.some((p) => pathname === p || pathname.startsWith(p + '/'));
+}
+// The printed quote is the actual customer-facing deliverable — employees
+// can draft/view quotes but can't be the ones who send them, so this stays
+// blocked for them regardless of the quote's approval state.
+function isQuotePrint(pathname) {
+  return /^\/quotes\/[^/]+\/print(\/.*)?$/.test(pathname);
 }
 
 export async function middleware(req) {
@@ -47,6 +54,10 @@ export async function middleware(req) {
 
   if (matches(pathname, FULL_ACCESS_PREFIXES) && session.role === 'employee') {
     return NextResponse.redirect(new URL('/dashboard?denied=1', req.url));
+  }
+
+  if (isQuotePrint(pathname) && session.role === 'employee') {
+    return NextResponse.redirect(new URL('/quotes?denied=1', req.url));
   }
 
   return NextResponse.next();

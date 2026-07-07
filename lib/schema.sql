@@ -59,7 +59,18 @@ create table if not exists quotes (
   total numeric not null default 0,
   status text not null default 'Draft',
   notes text default '',
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  -- Employee-drafted quotes need manager/admin sign-off before they can be
+  -- sent; quotes created by a manager/admin are auto-approved since they
+  -- already have full authority. See app/api/quotes/[id]/review/route.js.
+  approval_status text not null default 'Approved',
+  -- Not a foreign key on purpose: backup restore never touches the users
+  -- table, so a hard reference here could break a restore if the creating
+  -- user was since deleted. created_by (a name snapshot) covers display.
+  created_by_id uuid,
+  created_by text default '',
+  approval_note text default '',
+  reviewed_by text default ''
 );
 
 create table if not exists quote_line_items (

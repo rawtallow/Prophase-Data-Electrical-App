@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from '../ui-feedback';
 import { money } from '../../../lib/format';
 
-export default function QuoteForm({ existing, clients }) {
+export default function QuoteForm({ existing, clients, fullAccess }) {
   const router = useRouter();
   const [form, setForm] = useState(
     existing
@@ -58,7 +58,7 @@ export default function QuoteForm({ existing, clients }) {
     });
     setSaving(false);
     if (res.ok) {
-      toast.success(form.id ? 'Quote updated' : 'Quote created');
+      toast.success(fullAccess ? (form.id ? 'Quote updated' : 'Quote created') : 'Submitted for approval');
       router.push('/quotes');
       router.refresh();
     } else {
@@ -67,9 +67,28 @@ export default function QuoteForm({ existing, clients }) {
     }
   }
 
+  // A manager/admin can still open an employee's not-yet-approved quote
+  // directly via its edit link — Sent/Accepted/Declined stay off the table
+  // until it's actually approved, matching the server-side rule.
+  const statusOptions = (!existing || existing.approval_status === 'Approved')
+    ? ['Draft', 'Sent', 'Accepted', 'Declined']
+    : ['Draft'];
+
   return (
     <>
       <h2 className="section-title">{existing ? `Edit Quote ${existing.quote_number}` : 'New Quote'}</h2>
+      {!fullAccess && (
+        <div className="panel small-note" style={{ marginBottom: 14 }}>
+          {existing?.approval_status === 'Rejected'
+            ? 'A manager sent this back — make your changes and save to resubmit it for approval.'
+            : 'This quote will need manager or admin approval before it can be sent to the customer.'}
+        </div>
+      )}
+      {existing?.approval_status === 'Rejected' && existing?.approval_note && (
+        <div className="error-box" style={{ marginBottom: 14 }}>
+          <strong>Feedback from {existing.reviewed_by || 'reviewer'}:</strong> {existing.approval_note}
+        </div>
+      )}
       <div className="panel">
         <div className="grid-2">
           <div className="field">
@@ -103,15 +122,17 @@ export default function QuoteForm({ existing, clients }) {
         </table>
         <button className="btn ghost sm" style={{ marginTop: 10 }} onClick={addItem}>+ Add Line Item</button>
 
-        <div className="grid-3" style={{ marginTop: 20 }}>
+        <div className={fullAccess ? 'grid-3' : 'grid-2'} style={{ marginTop: 20 }}>
           <div className="field"><label>GST (%)</label><input type="number" min="0" step="0.01" value={form.taxRate} onChange={(e) => setForm({ ...form, taxRate: e.target.value })} /></div>
           <div className="field"><label>Discount ($)</label><input type="number" min="0" step="0.01" value={form.discount} onChange={(e) => setForm({ ...form, discount: e.target.value })} /></div>
-          <div className="field">
-            <label>Status</label>
-            <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
-              {['Draft', 'Sent', 'Accepted', 'Declined'].map((s) => <option key={s}>{s}</option>)}
-            </select>
-          </div>
+          {fullAccess && (
+            <div className="field">
+              <label>Status</label>
+              <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+                {statusOptions.map((s) => <option key={s}>{s}</option>)}
+              </select>
+            </div>
+          )}
         </div>
         <div className="field">
           <label>Notes / Terms</label>

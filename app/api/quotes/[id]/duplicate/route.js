@@ -16,11 +16,15 @@ export async function POST(req, { params }) {
   const numRows = await sql`update counters set value = value + 1 where key = 'quote' returning value`;
   const quoteNumber = 'Q-' + String(numRows[0].value).padStart(4, '0');
 
+  // This route is manager/admin-only (checked above), so the duplicate is
+  // always auto-approved under whoever clicked Duplicate — not the original
+  // quote's creator/approval history, which doesn't carry over.
   const newRows = await sql`
     insert into quotes (quote_number, client_id, client_name, client_phone, client_email, client_address, job_description,
-      tax_rate, discount, subtotal, tax, total, status, notes)
+      tax_rate, discount, subtotal, tax, total, status, notes, approval_status, created_by_id, created_by)
     values (${quoteNumber}, ${q.client_id}, ${q.client_name}, ${q.client_phone}, ${q.client_email}, ${q.client_address},
-      ${q.job_description}, ${q.tax_rate}, ${q.discount}, ${q.subtotal}, ${q.tax}, ${q.total}, 'Draft', ${q.notes})
+      ${q.job_description}, ${q.tax_rate}, ${q.discount}, ${q.subtotal}, ${q.tax}, ${q.total}, 'Draft', ${q.notes},
+      'Approved', ${session.id}, ${session.name})
     returning *
   `;
   const newQuote = newRows[0];
