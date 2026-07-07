@@ -6,8 +6,10 @@ export default async function JobsPage() {
   const session = await getSession();
   const fullAccess = CAN.viewFinancials(session.role);
 
+  // High-priority jobs first, then Medium, then Low, so urgent work stays
+  // visible at the top of the log instead of buried by date.
   const [jobs, clients, laborRows] = await Promise.all([
-    sql`select * from jobs order by created_date desc, job_number desc`,
+    sql(`select * from jobs order by case priority when 'High' then 0 when 'Medium' then 1 when 'Low' then 2 else 1 end, created_date desc, job_number desc`),
     sql`select id, name from clients order by name asc`,
     fullAccess
       ? sql`

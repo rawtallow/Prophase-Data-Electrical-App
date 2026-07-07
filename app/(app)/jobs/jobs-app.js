@@ -6,7 +6,7 @@ import Modal from '../modal';
 function money(n) {
   return '$' + (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
-function slug(s) { return String(s).toLowerCase().replace(/\s+/g, ''); }
+function slug(s) { return String(s).toLowerCase().replace(/[^a-z0-9]/g, ''); }
 function dstr(d) {
   if (!d) return '';
   if (d instanceof Date) {
@@ -19,10 +19,14 @@ function dstr(d) {
 }
 
 const STATUSES = ['Quoted', 'Scheduled', 'In Progress', 'Complete'];
+const PRIORITIES = ['High', 'Medium', 'Low'];
+const JOB_TYPES = ['Call Out', 'Scheduled / Preventative Maintenance', 'Quoted Job'];
 
 export default function JobsApp({ initialJobs, clients, laborByJob, fullAccess, canManageJobs }) {
   const [jobs, setJobs] = useState(initialJobs);
   const [statusFilter, setStatusFilter] = useState('');
+  const [priorityFilter, setPriorityFilter] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
   const [search, setSearch] = useState('');
   const [modal, setModal] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -34,7 +38,7 @@ export default function JobsApp({ initialJobs, clients, laborByJob, fullAccess, 
   }
 
   function emptyJob() {
-    return { clientName: '', jobDescription: '', scheduledDate: '', status: 'Quoted', amountInvoiced: 0, amountPaid: 0, notes: '' };
+    return { clientName: '', jobDescription: '', scheduledDate: '', status: 'Quoted', priority: 'Medium', jobType: 'Quoted Job', amountInvoiced: 0, amountPaid: 0, notes: '' };
   }
 
   function openNew() { setModal(emptyJob()); }
@@ -45,6 +49,8 @@ export default function JobsApp({ initialJobs, clients, laborByJob, fullAccess, 
       jobDescription: j.job_description || '',
       scheduledDate: dstr(j.scheduled_date),
       status: j.status,
+      priority: j.priority || 'Medium',
+      jobType: j.job_type || 'Quoted Job',
       amountInvoiced: j.amount_invoiced,
       amountPaid: j.amount_paid,
       notes: j.notes || '',
@@ -95,6 +101,8 @@ export default function JobsApp({ initialJobs, clients, laborByJob, fullAccess, 
 
   const list = jobs.filter((j) => {
     if (statusFilter && j.status !== statusFilter) return false;
+    if (priorityFilter && j.priority !== priorityFilter) return false;
+    if (typeFilter && j.job_type !== typeFilter) return false;
     if (search) {
       const s = search.toLowerCase();
       if (!j.client_name.toLowerCase().includes(s) && !j.job_number.toLowerCase().includes(s)) return false;
@@ -107,6 +115,14 @@ export default function JobsApp({ initialJobs, clients, laborByJob, fullAccess, 
       <div className="toolbar">
         <h2 className="section-title" style={{ margin: 0 }}>Job Log</h2>
         <div className="filters">
+          <select value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value)}>
+            <option value="">All Priorities</option>
+            {PRIORITIES.map((p) => <option key={p}>{p}</option>)}
+          </select>
+          <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
+            <option value="">All Job Types</option>
+            {JOB_TYPES.map((t) => <option key={t}>{t}</option>)}
+          </select>
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
             <option value="">All Statuses</option>
             {STATUSES.map((s) => <option key={s}>{s}</option>)}
@@ -119,7 +135,7 @@ export default function JobsApp({ initialJobs, clients, laborByJob, fullAccess, 
         <table>
           <thead>
             <tr>
-              <th>Job #</th><th>Customer</th><th>Description</th><th>Scheduled</th><th>Status</th>
+              <th>Job #</th><th>Priority</th><th>Type</th><th>Customer</th><th>Description</th><th>Scheduled</th><th>Status</th>
               {fullAccess && <><th className="num">Invoiced</th><th className="num">Paid</th><th className="num">Balance</th><th className="num">Labor Cost</th><th className="num">Margin</th></>}
               <th>Actions</th>
             </tr>
@@ -133,6 +149,8 @@ export default function JobsApp({ initialJobs, clients, laborByJob, fullAccess, 
               return (
                 <tr key={j.id}>
                   <td>{j.job_number}</td>
+                  <td><span className={`badge ${slug(j.priority)}`}>{j.priority}</span></td>
+                  <td><span className={`badge ${slug(j.job_type)}`}>{j.job_type}</span></td>
                   <td>{j.client_name}</td>
                   <td>{j.job_description || '—'}</td>
                   <td>{dstr(j.scheduled_date) || '—'}</td>
@@ -178,6 +196,20 @@ export default function JobsApp({ initialJobs, clients, laborByJob, fullAccess, 
             <div className="field">
               <label>Job Description</label>
               <textarea rows={2} disabled={!!modal.id && !canManageJobs} value={modal.jobDescription} onChange={(e) => setModal({ ...modal, jobDescription: e.target.value })} />
+            </div>
+            <div className="grid-2">
+              <div className="field">
+                <label>Job Type</label>
+                <select disabled={!!modal.id && !canManageJobs} value={modal.jobType} onChange={(e) => setModal({ ...modal, jobType: e.target.value })}>
+                  {JOB_TYPES.map((t) => <option key={t}>{t}</option>)}
+                </select>
+              </div>
+              <div className="field">
+                <label>Priority</label>
+                <select value={modal.priority} onChange={(e) => setModal({ ...modal, priority: e.target.value })}>
+                  {PRIORITIES.map((p) => <option key={p}>{p}</option>)}
+                </select>
+              </div>
             </div>
             <div className="grid-3">
               <div className="field">

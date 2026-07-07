@@ -80,6 +80,8 @@ create table if not exists jobs (
   job_description text default '',
   scheduled_date date,
   status text not null default 'Quoted',
+  priority text not null default 'Medium',
+  job_type text not null default 'Quoted Job',
   amount_invoiced numeric not null default 0,
   amount_paid numeric not null default 0,
   notes text default '',

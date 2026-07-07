@@ -46,12 +46,13 @@ export default async function DashboardPage() {
           <h2 className="section-title">Your Active Jobs</h2>
           <table>
             <thead>
-              <tr><th>Job #</th><th>Customer</th><th>Scheduled</th><th>Status</th></tr>
+              <tr><th>Job #</th><th>Priority</th><th>Customer</th><th>Scheduled</th><th>Status</th></tr>
             </thead>
             <tbody>
               {activeJobs.map((j) => (
                 <tr key={j.id}>
                   <td>{j.job_number}</td>
+                  <td><span className={`badge ${slug(j.priority)}`}>{j.priority}</span></td>
                   <td>{j.client_name}</td>
                   <td>{fmtDate(j.scheduled_date)}</td>
                   <td><span className={`badge ${slug(j.status)}`}>{j.status}</span></td>
@@ -116,11 +117,12 @@ export default async function DashboardPage() {
       <div className="panel">
         <h2 className="section-title">Active Jobs</h2>
         <table>
-          <thead><tr><th>Job #</th><th>Customer</th><th>Scheduled</th><th>Status</th><th className="num">Balance</th></tr></thead>
+          <thead><tr><th>Job #</th><th>Priority</th><th>Customer</th><th>Scheduled</th><th>Status</th><th className="num">Balance</th></tr></thead>
           <tbody>
             {activeJobsList.map((j) => (
               <tr key={j.id}>
                 <td>{j.job_number}</td>
+                <td><span className={`badge ${slug(j.priority)}`}>{j.priority}</span></td>
                 <td>{j.client_name}</td>
                 <td>{fmtDate(j.scheduled_date)}</td>
                 <td><span className={`badge ${slug(j.status)}`}>{j.status}</span></td>

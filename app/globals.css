@@ -131,6 +131,12 @@ tr:hover td { background: #fafbfc; }
 .badge.admin { background:#241a06; color: var(--amber-light); }
 .badge.manager { background:#e4ecfd; color: var(--blue); }
 .badge.employee { background:#eef0f3; color:#566072; }
+.badge.low { background: #eef0f3; color: #566072; }
+.badge.medium { background: #fff4de; color: #a5690c; }
+.badge.high { background: #fdecea; color: var(--red); }
+.badge.callout { background: #e4ecfd; color: var(--blue); }
+.badge.scheduledpreventativemaintenance { background: #e4f6ec; color: var(--green); }
+.badge.quotedjob { background: #eef0f3; color: #566072; }
 
 .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
 .filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }

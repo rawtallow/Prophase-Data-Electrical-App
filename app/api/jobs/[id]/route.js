@@ -12,11 +12,12 @@ export async function PUT(req, { params }) {
   const fullAccess = CAN.viewFinancials(session.role);
 
   if (fullAccess) {
-    const { clientName, jobDescription, scheduledDate, status, amountInvoiced, amountPaid, notes } = body;
+    const { clientName, jobDescription, scheduledDate, status, priority, jobType, amountInvoiced, amountPaid, notes } = body;
     const rows = await sql`
       update jobs set
         client_name = ${clientName}, job_description = ${jobDescription || ''},
         scheduled_date = ${scheduledDate || null}, status = ${status},
+        priority = ${priority || 'Medium'}, job_type = ${jobType || 'Quoted Job'},
         amount_invoiced = ${Number(amountInvoiced) || 0}, amount_paid = ${Number(amountPaid) || 0},
         notes = ${notes || ''}
       where id = ${params.id}
@@ -25,11 +26,12 @@ export async function PUT(req, { params }) {
     return NextResponse.json(rows[0]);
   }
 
-  // Employees: allowed to update status, scheduled date, and notes only.
-  const { scheduledDate, status, notes } = body;
+  // Employees: allowed to update status, scheduled date, priority, and notes.
+  // Job type stays admin/manager-only, like customer name and description.
+  const { scheduledDate, status, priority, notes } = body;
   const rows = await sql`
     update jobs set
-      scheduled_date = ${scheduledDate || null}, status = ${status}, notes = ${notes || ''}
+      scheduled_date = ${scheduledDate || null}, status = ${status}, priority = ${priority || 'Medium'}, notes = ${notes || ''}
     where id = ${params.id}
     returning *
   `;
