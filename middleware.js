@@ -53,5 +53,8 @@ export async function middleware(req) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)']
+  // icon.svg is Next's App Router favicon convention (app/icon.svg) — without
+  // this exclusion the middleware 307-redirects the unauthenticated favicon
+  // request to /login, so the tab icon never loads until you're signed in.
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|icon.svg).*)']
 };
