@@ -148,6 +148,12 @@ tr:hover td { background: #fafbfc; }
 .badge.callout { background: #e4ecfd; color: var(--blue); }
 .badge.scheduledpreventativemaintenance { background: #e4f6ec; color: var(--green); }
 .badge.quotedjob { background: #eef0f3; color: #566072; }
+.badge.certificateofcompliance { background: #e4ecfd; color: var(--blue); }
+.badge.rcdsafetyswitchtest { background: #fff4de; color: #a5690c; }
+.badge.testtag { background: #eef0f3; color: #566072; }
+.badge.compliant { background: #e4f6ec; color: var(--green); }
+.badge.noncompliant { background: #fdecea; color: var(--red); }
+.badge.na { background: #eef0f3; color: #566072; }
 
 .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
 .filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }

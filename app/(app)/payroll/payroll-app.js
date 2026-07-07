@@ -4,7 +4,10 @@ import { toast, confirmDialog } from '../ui-feedback';
 import Modal from '../modal';
 import { money, toDateInputValue as dstr, toDisplayDate as fmtDate } from '../../../lib/format';
 
-function today() { return new Date().toISOString().slice(0, 10); }
+// toISOString() is UTC-based, so "today" near midnight local time can
+// resolve to the wrong calendar day (e.g. it read one day behind in
+// Sydney, UTC+10) — dstr() extracts local date components instead.
+function today() { return dstr(new Date()); }
 
 export default function PayrollApp({ initialEmployees, initialEntries, initialDraws, jobs }) {
   const [sub, setSub] = useState('employees');
@@ -45,7 +48,16 @@ export default function PayrollApp({ initialEmployees, initialEntries, initialDr
   const ytdTotal = entries.reduce((s, e) => s + Number(e.net_pay), 0) + draws.reduce((s, d) => s + Number(d.amount), 0);
 
   // ---- employees ----
-  function emptyEmp() { return { name: '', phone: '', hourlyRate: 0, status: 'Active' }; }
+  function emptyEmp() { return { name: '', phone: '', hourlyRate: 0, status: 'Active', licenseNumber: '', licenseExpiry: '' }; }
+  // Warns once a license is within 60 days of expiry (or already expired), so
+  // it surfaces before a job gets scheduled with an out-of-date license.
+  function licenseWarning(expiry) {
+    if (!expiry) return null;
+    const days = (new Date(expiry) - new Date()) / 86400000;
+    if (days < 0) return 'expired';
+    if (days <= 60) return 'expiring';
+    return null;
+  }
   async function saveEmp() {
     if (!empModal.name.trim()) return toast.error('Employee name is required');
     setSavingEmp(true);
@@ -216,21 +228,32 @@ export default function PayrollApp({ initialEmployees, initialEntries, initialDr
           </div>
           <div className="panel">
             <table>
-              <thead><tr><th>Name</th><th>Phone</th><th className="num">Hourly Rate</th><th>Status</th><th className="num">Total Paid</th><th>Actions</th></tr></thead>
+              <thead><tr><th>Name</th><th>Phone</th><th className="num">Hourly Rate</th><th>Status</th><th>License</th><th className="num">Total Paid</th><th>Actions</th></tr></thead>
               <tbody>
                 {employees.map((e) => {
                   const ytd = entries.filter((p) => p.employee_id === e.id).reduce((s, p) => s + Number(p.net_pay), 0);
                   const busy = busyId === e.id;
+                  const warn = licenseWarning(e.license_expiry);
                   return (
                     <tr key={e.id}>
                       <td>{e.name}</td>
                       <td>{e.phone || '—'}</td>
                       <td className="num">{money(e.hourly_rate)}/hr</td>
                       <td><span className={`badge ${e.status === 'Inactive' ? 'inactive' : 'activestatus'}`}>{e.status}</span></td>
+                      <td>
+                        {e.license_number || '—'}
+                        {e.license_expiry && (
+                          <div>
+                            <span className={`badge ${warn ? 'lowstock' : 'instock'}`}>
+                              {warn === 'expired' ? 'Expired' : warn === 'expiring' ? 'Expiring Soon' : 'Valid'} {dstr(e.license_expiry)}
+                            </span>
+                          </div>
+                        )}
+                      </td>
                       <td className="num">{money(ytd)}</td>
                       <td>
                         <div className="row-actions">
-                          <button className="btn ghost sm" disabled={busy} onClick={() => setEmpModal({ id: e.id, name: e.name, phone: e.phone || '', hourlyRate: e.hourly_rate, status: e.status })}>Edit</button>
+                          <button className="btn ghost sm" disabled={busy} onClick={() => setEmpModal({ id: e.id, name: e.name, phone: e.phone || '', hourlyRate: e.hourly_rate, status: e.status, licenseNumber: e.license_number || '', licenseExpiry: dstr(e.license_expiry) })}>Edit</button>
                           <button className="btn danger sm" disabled={busy} onClick={() => delEmp(e.id)}>{busy ? 'Deleting…' : 'Delete'}</button>
                         </div>
                       </td>
@@ -339,6 +362,10 @@ export default function PayrollApp({ initialEmployees, initialEntries, initialDr
               <select value={empModal.status} onChange={(e) => setEmpModal({ ...empModal, status: e.target.value })}>
                 <option>Active</option><option>Inactive</option>
               </select>
+            </div>
+            <div className="grid-2">
+              <div className="field"><label>Electrical License Number</label><input value={empModal.licenseNumber} onChange={(e) => setEmpModal({ ...empModal, licenseNumber: e.target.value })} /></div>
+              <div className="field"><label>License Expiry</label><input type="date" value={empModal.licenseExpiry} onChange={(e) => setEmpModal({ ...empModal, licenseExpiry: e.target.value })} /></div>
             </div>
             <div className="modal-actions">
               <button className="btn ghost" disabled={savingEmp} onClick={() => setEmpModal(null)}>Cancel</button>

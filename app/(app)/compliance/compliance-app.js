@@ -1,0 +1,325 @@
+'use client';
+import { useState } from 'react';
+import { toast, confirmDialog } from '../ui-feedback';
+import Modal from '../modal';
+import { COMPLIANCE_TYPES, COMPLIANCE_RESULTS } from '../../../lib/compliance-types';
+import { slug, toDateInputValue as dstr } from '../../../lib/format';
+
+// toISOString() is UTC-based, so "today" near midnight local time can
+// resolve to the wrong calendar day (e.g. it read one day behind in
+// Sydney, UTC+10) — dstr() extracts local date components instead.
+function today() { return dstr(new Date()); }
+
+// Warns once something is within 30 days of its retest-due date (or
+// already overdue), so it's visible before it lapses.
+function dueSoon(retestDue) {
+  if (!retestDue) return null;
+  const days = (new Date(retestDue) - new Date()) / 86400000;
+  if (days < 0) return 'overdue';
+  if (days <= 30) return 'soon';
+  return null;
+}
+function licenseWarning(expiry) {
+  if (!expiry) return null;
+  const days = (new Date(expiry) - new Date()) / 86400000;
+  if (days < 0) return 'expired';
+  if (days <= 60) return 'expiring';
+  return null;
+}
+
+export default function ComplianceApp({ initialRecords, jobs, clients, employees, canManage }) {
+  const [records, setRecords] = useState(initialRecords);
+  const [typeFilter, setTypeFilter] = useState('');
+  const [search, setSearch] = useState('');
+  const [modal, setModal] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [busyId, setBusyId] = useState(null);
+
+  async function refresh() {
+    const rows = await fetch('/api/compliance').then((r) => r.json());
+    setRecords(rows);
+  }
+
+  function emptyRecord() {
+    return {
+      type: COMPLIANCE_TYPES[0], jobId: '', clientId: '', employeeId: '',
+      recordDate: today(), referenceNumber: '', result: '', retestDue: '',
+      description: '', notes: '', file: null
+    };
+  }
+
+  function openNew() { setModal(emptyRecord()); }
+
+  function openEdit(r) {
+    setModal({
+      id: r.id,
+      type: r.type,
+      jobId: r.job_id || '',
+      clientId: r.client_id || '',
+      employeeId: r.employee_id || '',
+      recordDate: dstr(r.record_date),
+      referenceNumber: r.reference_number || '',
+      result: r.result || '',
+      retestDue: dstr(r.retest_due),
+      description: r.description || '',
+      notes: r.notes || '',
+      fileUrl: r.file_url
+    });
+  }
+
+  function onJobChange(jobId) {
+    const job = jobs.find((j) => j.id === jobId);
+    setModal({ ...modal, jobId, clientId: job ? job.client_id || '' : modal.clientId });
+  }
+
+  async function save() {
+    setSaving(true);
+    try {
+      let res;
+      if (modal.id) {
+        res = await fetch(`/api/compliance/${modal.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(modal)
+        });
+      } else {
+        const formData = new FormData();
+        formData.append('type', modal.type);
+        formData.append('jobId', modal.jobId);
+        formData.append('clientId', modal.clientId);
+        formData.append('employeeId', modal.employeeId);
+        formData.append('recordDate', modal.recordDate);
+        formData.append('referenceNumber', modal.referenceNumber);
+        formData.append('result', modal.result);
+        formData.append('retestDue', modal.retestDue);
+        formData.append('description', modal.description);
+        formData.append('notes', modal.notes);
+        if (modal.file) formData.append('file', modal.file);
+        res = await fetch('/api/compliance', { method: 'POST', body: formData });
+      }
+      if (res.ok) {
+        toast.success(modal.id ? 'Record updated' : 'Record saved');
+        setModal(null);
+        await refresh();
+      } else {
+        const d = await res.json().catch(() => ({}));
+        toast.error(d.error || 'Could not save record');
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function del(id) {
+    const ok = await confirmDialog('Delete this compliance record? This cannot be undone.', {
+      title: 'Delete record',
+      confirmLabel: 'Delete Record',
+      danger: true
+    });
+    if (!ok) return;
+    setBusyId(id);
+    try {
+      await fetch(`/api/compliance/${id}`, { method: 'DELETE' });
+      toast.success('Record deleted');
+      await refresh();
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  const list = records.filter((r) => {
+    if (typeFilter && r.type !== typeFilter) return false;
+    if (search) {
+      const s = search.toLowerCase();
+      const haystack = [r.reference_number, r.description, r.job_number, r.client_name, r.employee_name].join(' ').toLowerCase();
+      if (!haystack.includes(s)) return false;
+    }
+    return true;
+  });
+
+  const dueSoonCount = records.filter((r) => dueSoon(r.retest_due)).length;
+  const expiringLicenses = employees.filter((e) => licenseWarning(e.license_expiry));
+
+  return (
+    <>
+      <div className="cards">
+        <div className="card"><div className="label">Records Logged</div><div className="value">{records.length}</div></div>
+        <div className={`card${dueSoonCount ? ' warn' : ''}`}><div className="label">Retests Due Soon / Overdue</div><div className="value">{dueSoonCount}</div></div>
+        <div className={`card${expiringLicenses.length ? ' warn' : ''}`}><div className="label">Licenses Expiring Soon</div><div className="value">{expiringLicenses.length}</div></div>
+      </div>
+
+      <div className="panel">
+        <h2 className="section-title">Licensed Team</h2>
+        <table>
+          <thead><tr><th>Name</th><th>License Number</th><th>Expiry</th></tr></thead>
+          <tbody>
+            {employees.map((e) => {
+              const warn = licenseWarning(e.license_expiry);
+              return (
+                <tr key={e.id}>
+                  <td>{e.name}</td>
+                  <td>{e.license_number || '—'}</td>
+                  <td>
+                    {e.license_expiry ? (
+                      <span className={`badge ${warn ? 'lowstock' : 'instock'}`}>
+                        {warn === 'expired' ? 'Expired' : warn === 'expiring' ? 'Expiring Soon' : 'Valid'} {dstr(e.license_expiry)}
+                      </span>
+                    ) : '—'}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        {employees.length === 0 && <div className="empty">No active team members yet — add them from Payroll &gt; Employees.</div>}
+      </div>
+
+      <div className="toolbar">
+        <h2 className="section-title" style={{ margin: 0 }}>Compliance Records</h2>
+        <div className="filters">
+          <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
+            <option value="">All Types</option>
+            {COMPLIANCE_TYPES.map((t) => <option key={t}>{t}</option>)}
+          </select>
+          <input placeholder="Search reference, job, client..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          <button className="btn amber sm" onClick={openNew}>+ Add Record</button>
+        </div>
+      </div>
+
+      <div className="panel">
+        <table>
+          <thead>
+            <tr>
+              <th>Type</th><th>Date</th><th>Reference #</th><th>Job / Client</th><th>Electrician</th>
+              <th>Result</th><th>Retest Due</th><th>File</th><th>Logged By</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {list.map((r) => {
+              const busy = busyId === r.id;
+              const warn = dueSoon(r.retest_due);
+              return (
+                <tr key={r.id}>
+                  <td><span className={`badge ${slug(r.type)}`}>{r.type}</span></td>
+                  <td>{dstr(r.record_date) || '—'}</td>
+                  <td>{r.reference_number || '—'}</td>
+                  <td>{r.job_number ? `${r.job_number} — ${r.client_name || ''}` : r.client_name || '—'}</td>
+                  <td>{r.employee_name || '—'}</td>
+                  <td>{r.result ? <span className={`badge ${slug(r.result)}`}>{r.result}</span> : '—'}</td>
+                  <td>
+                    {r.retest_due ? (
+                      <span className={`badge ${warn ? 'lowstock' : 'instock'}`}>{dstr(r.retest_due)}</span>
+                    ) : '—'}
+                  </td>
+                  <td>
+                    {r.file_url ? (
+                      <a href={r.file_url} target="_blank" rel="noreferrer">
+                        {/\.(jpe?g|png|webp)$/i.test(r.file_url) ? (
+                          <img src={r.file_url} alt="Certificate" style={{ width: 40, height: 40, borderRadius: 6, objectFit: 'cover', display: 'block' }} />
+                        ) : 'View PDF'}
+                      </a>
+                    ) : '—'}
+                  </td>
+                  <td>{r.uploaded_by}</td>
+                  <td>
+                    <div className="row-actions">
+                      {canManage && <button className="btn ghost sm" disabled={busy} onClick={() => openEdit(r)}>Edit</button>}
+                      {canManage && <button className="btn danger sm" disabled={busy} onClick={() => del(r.id)}>{busy ? 'Deleting…' : 'Delete'}</button>}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        {list.length === 0 && <div className="empty">No compliance records match your filters.</div>}
+      </div>
+
+      <Modal open={!!modal}>
+        {modal && (
+          <>
+            <h3>{modal.id ? 'Edit Compliance Record' : 'Add Compliance Record'}</h3>
+            <div className="grid-2">
+              <div className="field">
+                <label>Type *</label>
+                <select value={modal.type} onChange={(e) => setModal({ ...modal, type: e.target.value })}>
+                  {COMPLIANCE_TYPES.map((t) => <option key={t}>{t}</option>)}
+                </select>
+              </div>
+              <div className="field">
+                <label>Date *</label>
+                <input type="date" value={modal.recordDate} onChange={(e) => setModal({ ...modal, recordDate: e.target.value })} />
+              </div>
+            </div>
+            <div className="grid-2">
+              <div className="field">
+                <label>Job (optional)</label>
+                <select value={modal.jobId} onChange={(e) => onJobChange(e.target.value)}>
+                  <option value="">— Not tied to a job —</option>
+                  {jobs.map((j) => <option key={j.id} value={j.id}>{j.job_number} — {j.client_name}</option>)}
+                </select>
+              </div>
+              <div className="field">
+                <label>Client {modal.jobId ? '' : '(optional)'}</label>
+                <select disabled={!!modal.jobId} value={modal.clientId} onChange={(e) => setModal({ ...modal, clientId: e.target.value })}>
+                  <option value="">— Select client —</option>
+                  {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="grid-2">
+              <div className="field">
+                <label>Electrician</label>
+                <select value={modal.employeeId} onChange={(e) => setModal({ ...modal, employeeId: e.target.value })}>
+                  <option value="">— Select —</option>
+                  {employees.map((e) => <option key={e.id} value={e.id}>{e.name}{e.license_number ? ` (${e.license_number})` : ''}</option>)}
+                </select>
+              </div>
+              <div className="field">
+                <label>Reference / Certificate #</label>
+                <input value={modal.referenceNumber} onChange={(e) => setModal({ ...modal, referenceNumber: e.target.value })} />
+              </div>
+            </div>
+            <div className="grid-2">
+              <div className="field">
+                <label>Result</label>
+                <select value={modal.result} onChange={(e) => setModal({ ...modal, result: e.target.value })}>
+                  <option value="">— Not set —</option>
+                  {COMPLIANCE_RESULTS.map((r) => <option key={r}>{r}</option>)}
+                </select>
+              </div>
+              <div className="field">
+                <label>Retest / Next Due Date</label>
+                <input type="date" value={modal.retestDue} onChange={(e) => setModal({ ...modal, retestDue: e.target.value })} />
+              </div>
+            </div>
+            <div className="field">
+              <label>Description</label>
+              <input value={modal.description} onChange={(e) => setModal({ ...modal, description: e.target.value })} placeholder="e.g. Main switchboard upgrade, 3x power tools tested" />
+            </div>
+            <div className="field">
+              <label>Notes</label>
+              <textarea rows={2} value={modal.notes} onChange={(e) => setModal({ ...modal, notes: e.target.value })} />
+            </div>
+            {!modal.id && (
+              <div className="field">
+                <label>Attach Certificate (photo or PDF, optional)</label>
+                <input type="file" accept="image/*,application/pdf" onChange={(e) => setModal({ ...modal, file: e.target.files[0] || null })} />
+              </div>
+            )}
+            {modal.id && modal.fileUrl && (
+              <div className="field">
+                <label>Attached Certificate</label>
+                <div><a href={modal.fileUrl} target="_blank" rel="noreferrer">View attached file</a></div>
+              </div>
+            )}
+            <div className="modal-actions">
+              <button className="btn ghost" disabled={saving} onClick={() => setModal(null)}>Cancel</button>
+              <button className="btn amber" disabled={saving} onClick={save}>{saving ? 'Saving…' : 'Save Record'}</button>
+            </div>
+          </>
+        )}
+      </Modal>
+    </>
+  );
+}

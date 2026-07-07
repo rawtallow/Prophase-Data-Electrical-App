@@ -14,11 +14,11 @@ export async function GET() {
 export async function POST(req) {
   const session = await getSession();
   if (!session || !CAN.editPayroll(session.role)) return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
-  const { name, phone, hourlyRate, status } = await req.json();
+  const { name, phone, hourlyRate, status, licenseNumber, licenseExpiry } = await req.json();
   if (!name || !name.trim()) return NextResponse.json({ error: 'Employee name is required' }, { status: 400 });
   const rows = await sql`
-    insert into employees (name, phone, hourly_rate, status)
-    values (${name.trim()}, ${phone || ''}, ${Number(hourlyRate) || 0}, ${status || 'Active'})
+    insert into employees (name, phone, hourly_rate, status, license_number, license_expiry)
+    values (${name.trim()}, ${phone || ''}, ${Number(hourlyRate) || 0}, ${status || 'Active'}, ${licenseNumber || ''}, ${licenseExpiry || null})
     returning *
   `;
   return NextResponse.json(rows[0]);

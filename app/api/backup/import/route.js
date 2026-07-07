@@ -24,7 +24,9 @@ export async function POST(req) {
   // Build the full list of queries without executing them (the neon driver's
   // tagged calls are lazy until awaited), then run them atomically.
   const queries = [
-    // Delete children first to satisfy foreign keys.
+    // Delete children first to satisfy foreign keys. compliance_records
+    // references jobs/clients/employees, so it must go before all three.
+    sql`delete from compliance_records`,
     sql`delete from payroll_allocations`,
     sql`delete from payroll_entries`,
     sql`delete from quote_line_items`,
@@ -42,7 +44,10 @@ export async function POST(req) {
     queries.push(sql`insert into clients (id, name, phone, email, address, created_at) values (${c.id}, ${c.name}, ${c.phone}, ${c.email}, ${c.address}, ${c.created_at})`);
   }
   for (const e of data.employees) {
-    queries.push(sql`insert into employees (id, name, phone, hourly_rate, status) values (${e.id}, ${e.name}, ${e.phone}, ${e.hourly_rate}, ${e.status})`);
+    queries.push(sql`
+      insert into employees (id, name, phone, hourly_rate, status, license_number, license_expiry)
+      values (${e.id}, ${e.name}, ${e.phone}, ${e.hourly_rate}, ${e.status}, ${e.license_number || ''}, ${e.license_expiry || null})
+    `);
   }
   for (const q of data.quotes) {
     queries.push(sql`
@@ -103,6 +108,14 @@ export async function POST(req) {
       queries.push(sql`
         insert into receipts (id, vendor, purchase_date, amount, gst_amount, category, description, image_url, uploaded_by, created_at)
         values (${r.id}, ${r.vendor}, ${r.purchase_date}, ${r.amount}, ${r.gst_amount}, ${r.category}, ${r.description}, ${r.image_url}, ${r.uploaded_by}, ${r.created_at})
+      `);
+    }
+  }
+  if (Array.isArray(data.complianceRecords)) {
+    for (const cr of data.complianceRecords) {
+      queries.push(sql`
+        insert into compliance_records (id, type, job_id, client_id, employee_id, record_date, reference_number, result, retest_due, description, file_url, notes, uploaded_by, created_at)
+        values (${cr.id}, ${cr.type}, ${cr.job_id}, ${cr.client_id}, ${cr.employee_id}, ${cr.record_date}, ${cr.reference_number}, ${cr.result}, ${cr.retest_due}, ${cr.description}, ${cr.file_url}, ${cr.notes}, ${cr.uploaded_by}, ${cr.created_at})
       `);
     }
   }

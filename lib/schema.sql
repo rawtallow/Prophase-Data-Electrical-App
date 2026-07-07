@@ -95,7 +95,9 @@ create table if not exists employees (
   phone text default '',
   hourly_rate numeric not null default 0,
   status text not null default 'Active',
-  user_id uuid references users(id)
+  user_id uuid references users(id),
+  license_number text default '',
+  license_expiry date
 );
 
 create table if not exists payroll_entries (
@@ -160,6 +162,27 @@ create table if not exists receipts (
   category text not null default 'Other',
   description text default '',
   image_url text not null,
+  uploaded_by text not null default '',
+  created_at timestamptz not null default now()
+);
+
+-- Certificates of Compliance, RCD/safety switch test records, and Test & Tag
+-- records. Anyone can log one (they're usually the electrician who did the
+-- work on-site); editing/deleting is restricted to admin/manager so these
+-- legal/compliance records can't be altered after the fact.
+create table if not exists compliance_records (
+  id uuid primary key default gen_random_uuid(),
+  type text not null default 'Certificate of Compliance',
+  job_id uuid references jobs(id),
+  client_id uuid references clients(id),
+  employee_id uuid references employees(id),
+  record_date date not null default current_date,
+  reference_number text default '',
+  result text default '',
+  retest_due date,
+  description text default '',
+  file_url text,
+  notes text default '',
   uploaded_by text not null default '',
   created_at timestamptz not null default now()
 );

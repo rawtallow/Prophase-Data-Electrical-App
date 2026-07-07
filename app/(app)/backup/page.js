@@ -68,9 +68,9 @@ export default function BackupPage() {
       <h2 className="section-title">Backup &amp; Restore</h2>
       <div className="panel">
         <p className="small-note" style={{ marginBottom: 16 }}>
-          Export downloads everything — clients, assets, quotes, jobs, payroll, owner draws, and spare parts —
-          as a JSON file. Import replaces all of that data with the contents of a backup file. User accounts
-          and logins are never touched by either action.
+          Export downloads everything — clients, assets, quotes, jobs, payroll, owner draws, spare parts,
+          receipts, and compliance records — as a JSON file. Import replaces all of that data with the
+          contents of a backup file. User accounts and logins are never touched by either action.
         </p>
         {msg && (
           <div
