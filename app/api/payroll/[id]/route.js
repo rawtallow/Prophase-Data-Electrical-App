@@ -9,6 +9,9 @@ export async function PUT(req, { params }) {
   if (!session || !CAN.editPayroll(session.role)) return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
 
   const { employeeId, hourlyRate, datePaid, periodStart, periodEnd, allocations, netPay, notes } = await req.json();
+  if (periodStart && periodEnd && periodStart > periodEnd) {
+    return NextResponse.json({ error: 'Pay period start must be on or before the end date' }, { status: 400 });
+  }
   const emps = await sql`select * from employees where id = ${employeeId}`;
   const emp = emps[0];
   if (!emp) return NextResponse.json({ error: 'Employee not found' }, { status: 404 });

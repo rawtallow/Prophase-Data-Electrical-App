@@ -2,10 +2,7 @@
 import { useState } from 'react';
 import { toast, confirmDialog } from '../ui-feedback';
 import Modal from '../modal';
-
-function fmtDate(d) {
-  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
+import { toDisplayDate as fmtDate } from '../../../lib/format';
 
 export default function UsersApp({ initialUsers, myId }) {
   const [users, setUsers] = useState(initialUsers);

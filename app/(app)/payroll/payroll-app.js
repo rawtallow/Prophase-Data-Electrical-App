@@ -2,24 +2,8 @@
 import { useState } from 'react';
 import { toast, confirmDialog } from '../ui-feedback';
 import Modal from '../modal';
+import { money, toDateInputValue as dstr, toDisplayDate as fmtDate } from '../../../lib/format';
 
-function money(n) {
-  return '$' + (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-function dstr(d) {
-  if (!d) return '';
-  if (d instanceof Date) {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
-  }
-  return String(d).slice(0, 10);
-}
-function fmtDate(d) {
-  if (!d) return '—';
-  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
 function today() { return new Date().toISOString().slice(0, 10); }
 
 export default function PayrollApp({ initialEmployees, initialEntries, initialDraws, jobs }) {

@@ -28,6 +28,9 @@ export async function POST(req) {
 
   const { employeeId, hourlyRate, datePaid, periodStart, periodEnd, allocations, netPay, notes } = await req.json();
   if (!employeeId) return NextResponse.json({ error: 'Select an employee' }, { status: 400 });
+  if (periodStart && periodEnd && periodStart > periodEnd) {
+    return NextResponse.json({ error: 'Pay period start must be on or before the end date' }, { status: 400 });
+  }
 
   const emps = await sql`select * from employees where id = ${employeeId}`;
   const emp = emps[0];

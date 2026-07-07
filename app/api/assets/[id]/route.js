@@ -10,6 +10,9 @@ export async function PUT(req, { params }) {
     return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
   }
   const { name, model, serial, installDate, warrantyExpiry, notes } = await req.json();
+  if (!name || !name.trim()) {
+    return NextResponse.json({ error: 'Name / type is required' }, { status: 400 });
+  }
   const rows = await sql`
     update assets set name = ${name}, model = ${model || ''}, serial = ${serial || ''},
       install_date = ${installDate || null}, warranty_expiry = ${warrantyExpiry || null}, notes = ${notes || ''}

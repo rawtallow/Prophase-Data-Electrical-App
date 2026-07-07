@@ -1,16 +1,6 @@
 import { getSession, CAN } from '../../../lib/auth';
 import { sql } from '../../../lib/db';
-
-function money(n) {
-  return '$' + (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-function fmtDate(d) {
-  if (!d) return '—';
-  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
-function slug(s) {
-  return String(s).toLowerCase().replace(/\s+/g, '');
-}
+import { money, slug, toDisplayDate as fmtDate } from '../../../lib/format';
 
 export default async function DashboardPage() {
   const session = await getSession();

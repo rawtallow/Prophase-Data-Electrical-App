@@ -10,6 +10,9 @@ export async function PUT(req, { params }) {
     return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
   }
   const { name, phone, email, address } = await req.json();
+  if (!name || !name.trim()) {
+    return NextResponse.json({ error: 'Name is required' }, { status: 400 });
+  }
   const rows = await sql`
     update clients set name = ${name}, phone = ${phone || ''}, email = ${email || ''}, address = ${address || ''}
     where id = ${params.id}

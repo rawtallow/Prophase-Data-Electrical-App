@@ -2,21 +2,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast, confirmDialog } from '../ui-feedback';
-
-function money(n) {
-  return '$' + (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-function slug(s) { return String(s).toLowerCase().replace(/\s+/g, ''); }
-function dstr(d) {
-  if (!d) return '';
-  if (d instanceof Date) {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
-  }
-  return String(d).slice(0, 10);
-}
+import { money, slug, toDateInputValue as dstr } from '../../../lib/format';
 
 export default function QuotesApp({ initialQuotes }) {
   const router = useRouter();

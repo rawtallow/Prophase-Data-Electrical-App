@@ -10,6 +10,9 @@ export async function PUT(req, { params }) {
     return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
   }
   const { name, sku, category, supplier, unitCost, qtyOnHand, reorderThreshold, notes } = await req.json();
+  if (!name || !name.trim()) {
+    return NextResponse.json({ error: 'Name is required' }, { status: 400 });
+  }
   const rows = await sql`
     update parts set name = ${name}, sku = ${sku || ''}, category = ${category || ''}, supplier = ${supplier || ''},
       unit_cost = ${Number(unitCost) || 0}, qty_on_hand = ${Number(qtyOnHand) || 0}, reorder_threshold = ${Number(reorderThreshold) || 0},

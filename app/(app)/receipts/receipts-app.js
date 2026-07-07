@@ -3,28 +3,7 @@ import { useRef, useState } from 'react';
 import { toast, confirmDialog } from '../ui-feedback';
 import Modal from '../modal';
 import { RECEIPT_CATEGORIES } from '../../../lib/receipt-categories';
-
-function money(n) {
-  return '$' + (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-function dstr(d) {
-  if (!d) return '';
-  // Server-read `date` columns can arrive as native Date objects (parsed using
-  // local-time components by the DB driver). Reading them back with local
-  // getters recovers the correct calendar day regardless of server timezone —
-  // String(d) would instead produce a non-ISO string that breaks date inputs.
-  if (d instanceof Date) {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
-  }
-  return String(d).slice(0, 10);
-}
-function fmtDate(d) {
-  if (!d) return '—';
-  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
+import { money, toDateInputValue as dstr, toDisplayDate as fmtDate } from '../../../lib/format';
 // Australian financial year: 1 July – 30 June.
 function financialYearStart() {
   const now = new Date();
