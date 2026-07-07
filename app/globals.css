@@ -84,6 +84,17 @@ h2.section-title { font-size: 16px; font-weight: 800; margin: 0 0 12px; color: v
 .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
 @media (max-width: 720px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
 
+/* Tables commonly need more width than a phone screen has (Jobs alone has
+   13 columns). Rather than squeeze columns unreadably, let the table keep
+   its natural width and scroll horizontally within its own panel — the
+   header, nav, and filters above it stay put instead of the whole page
+   dragging sideways. The first column stays pinned as a scroll anchor
+   (usually the row's identifying number/name) so context isn't lost. */
+.panel:has(> table) { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.panel > table { min-width: 640px; }
+table th:first-child, table td:first-child { position: sticky; left: 0; background: var(--card); z-index: 1; }
+tr:hover td:first-child { background: #fafbfc; }
+
 label { font-size: 12.5px; font-weight: 600; color: var(--text-mute); display: block; margin-bottom: 4px; }
 input, select, textarea {
   width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px;
