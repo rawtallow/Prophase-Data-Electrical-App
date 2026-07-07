@@ -17,7 +17,7 @@ export default async function AppLayout({ children }) {
           <div className="bolt">&#9889;</div>
           <div>
             <h1>Prophase Data and Electrical</h1>
-            <div className="sub">Quoting, Jobs, Payroll &amp; Inventory</div>
+            <div className="sub">Hub</div>
           </div>
         </div>
         <div className="whoami">
