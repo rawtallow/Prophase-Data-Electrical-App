@@ -76,6 +76,7 @@ create table if not exists jobs (
   job_number text not null,
   quote_id uuid references quotes(id),
   client_id uuid references clients(id),
+  asset_id uuid references assets(id),
   client_name text not null,
   job_description text default '',
   scheduled_date date,

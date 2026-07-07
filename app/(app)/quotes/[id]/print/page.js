@@ -1,14 +1,7 @@
 import { sql } from '../../../../../lib/db';
 import { notFound } from 'next/navigation';
 import PrintButton from './print-button';
-
-function money(n) {
-  return '$' + (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-function dstr(d) {
-  if (!d) return '—';
-  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
+import { money, toDisplayDate as dstr } from '../../../../../lib/format';
 
 export default async function PrintQuotePage({ params }) {
   const [quotes, lineItems] = await Promise.all([
@@ -74,7 +67,7 @@ export default async function PrintQuotePage({ params }) {
       <div className="totals-box" style={{ marginTop: 14 }}>
         <div className="line"><span>Subtotal</span><span>{money(q.subtotal)}</span></div>
         <div className="line"><span>Discount</span><span>-{money(q.discount)}</span></div>
-        <div className="line"><span>Tax ({q.tax_rate}%)</span><span>{money(q.tax)}</span></div>
+        <div className="line"><span>GST ({q.tax_rate}%)</span><span>{money(q.tax)}</span></div>
         <div className="line total"><span>Total</span><span>{money(q.total)}</span></div>
       </div>
 

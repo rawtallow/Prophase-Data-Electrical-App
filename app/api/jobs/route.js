@@ -25,14 +25,14 @@ export async function POST(req) {
   if (!session || !CAN.manageJobs(session.role)) {
     return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
   }
-  const { clientId, clientName, jobDescription, scheduledDate, status, priority, jobType, amountInvoiced, amountPaid, notes, quoteId } = await req.json();
+  const { clientId, assetId, clientName, jobDescription, scheduledDate, status, priority, jobType, amountInvoiced, amountPaid, notes, quoteId } = await req.json();
   if (!clientName || !clientName.trim()) {
     return NextResponse.json({ error: 'Client is required' }, { status: 400 });
   }
   const jobNumber = await nextJobNumber();
   const rows = await sql`
-    insert into jobs (job_number, quote_id, client_id, client_name, job_description, scheduled_date, status, priority, job_type, amount_invoiced, amount_paid, notes)
-    values (${jobNumber}, ${quoteId || null}, ${clientId || null}, ${clientName.trim()}, ${jobDescription || ''}, ${scheduledDate || null},
+    insert into jobs (job_number, quote_id, client_id, asset_id, client_name, job_description, scheduled_date, status, priority, job_type, amount_invoiced, amount_paid, notes)
+    values (${jobNumber}, ${quoteId || null}, ${clientId || null}, ${assetId || null}, ${clientName.trim()}, ${jobDescription || ''}, ${scheduledDate || null},
       ${status || 'Quoted'}, ${priority || 'Medium'}, ${jobType || 'Quoted Job'}, ${Number(amountInvoiced) || 0}, ${Number(amountPaid) || 0}, ${notes || ''})
     returning *
   `;

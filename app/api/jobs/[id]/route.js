@@ -12,9 +12,10 @@ export async function PUT(req, { params }) {
   const fullAccess = CAN.viewFinancials(session.role);
 
   if (fullAccess) {
-    const { clientName, jobDescription, scheduledDate, status, priority, jobType, amountInvoiced, amountPaid, notes } = body;
+    const { clientId, assetId, clientName, jobDescription, scheduledDate, status, priority, jobType, amountInvoiced, amountPaid, notes } = body;
     const rows = await sql`
       update jobs set
+        client_id = ${clientId || null}, asset_id = ${assetId || null},
         client_name = ${clientName}, job_description = ${jobDescription || ''},
         scheduled_date = ${scheduledDate || null}, status = ${status},
         priority = ${priority || 'Medium'}, job_type = ${jobType || 'Quoted Job'},

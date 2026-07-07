@@ -8,9 +8,10 @@ export default async function JobsPage() {
 
   // High-priority jobs first, then Medium, then Low, so urgent work stays
   // visible at the top of the log instead of buried by date.
-  const [jobs, clients, laborRows] = await Promise.all([
+  const [jobs, clients, assets, laborRows] = await Promise.all([
     sql(`select * from jobs order by case priority when 'High' then 0 when 'Medium' then 1 when 'Low' then 2 else 1 end, created_date desc, job_number desc`),
     sql`select id, name from clients order by name asc`,
+    sql`select id, client_id, name from assets order by name asc`,
     fullAccess
       ? sql`
           select pa.job_id, sum(pa.reg_hours * pe.hourly_rate + pa.ot_hours * pe.hourly_rate * 1.5) as cost
@@ -27,6 +28,7 @@ export default async function JobsPage() {
     <JobsApp
       initialJobs={jobs}
       clients={clients}
+      assets={assets}
       laborByJob={laborByJob}
       fullAccess={fullAccess}
       canManageJobs={CAN.manageJobs(session.role)}

@@ -2,10 +2,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from '../ui-feedback';
-
-function money(n) {
-  return '$' + (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
+import { money } from '../../../lib/format';
 
 export default function QuoteForm({ existing, clients }) {
   const router = useRouter();
@@ -26,7 +23,7 @@ export default function QuoteForm({ existing, clients }) {
         }
       : {
           clientName: '', clientPhone: '', clientEmail: '', clientAddress: '',
-          jobDescription: '', taxRate: 0, discount: 0, status: 'Draft', notes: ''
+          jobDescription: '', taxRate: 10, discount: 0, status: 'Draft', notes: ''
         }
   );
   const [lineItems, setLineItems] = useState(
@@ -107,7 +104,7 @@ export default function QuoteForm({ existing, clients }) {
         <button className="btn ghost sm" style={{ marginTop: 10 }} onClick={addItem}>+ Add Line Item</button>
 
         <div className="grid-3" style={{ marginTop: 20 }}>
-          <div className="field"><label>Tax Rate (%)</label><input type="number" min="0" step="0.01" value={form.taxRate} onChange={(e) => setForm({ ...form, taxRate: e.target.value })} /></div>
+          <div className="field"><label>GST (%)</label><input type="number" min="0" step="0.01" value={form.taxRate} onChange={(e) => setForm({ ...form, taxRate: e.target.value })} /></div>
           <div className="field"><label>Discount ($)</label><input type="number" min="0" step="0.01" value={form.discount} onChange={(e) => setForm({ ...form, discount: e.target.value })} /></div>
           <div className="field">
             <label>Status</label>
@@ -124,7 +121,7 @@ export default function QuoteForm({ existing, clients }) {
         <div className="totals-box">
           <div className="line"><span>Subtotal</span><span>{money(subtotal)}</span></div>
           <div className="line"><span>Discount</span><span>-{money(form.discount)}</span></div>
-          <div className="line"><span>Tax ({Number(form.taxRate) || 0}%)</span><span>{money(tax)}</span></div>
+          <div className="line"><span>GST ({Number(form.taxRate) || 0}%)</span><span>{money(tax)}</span></div>
           <div className="line total"><span>Total</span><span>{money(total)}</span></div>
         </div>
 

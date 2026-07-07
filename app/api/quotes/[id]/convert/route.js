@@ -20,5 +20,8 @@ export async function POST(req, { params }) {
     values (${jobNumber}, ${q.id}, ${q.client_id}, ${q.client_name}, ${q.job_description}, 'Quoted', ${q.total}, 0)
     returning *
   `;
+  // Converting to a job means the customer accepted it — keep the quote's
+  // status in sync so it doesn't sit as "Draft"/"Sent" while work proceeds.
+  await sql`update quotes set status = 'Accepted' where id = ${q.id}`;
   return NextResponse.json(rows[0]);
 }

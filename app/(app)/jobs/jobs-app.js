@@ -2,27 +2,13 @@
 import { useState } from 'react';
 import { toast, confirmDialog } from '../ui-feedback';
 import Modal from '../modal';
-
-function money(n) {
-  return '$' + (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-function slug(s) { return String(s).toLowerCase().replace(/[^a-z0-9]/g, ''); }
-function dstr(d) {
-  if (!d) return '';
-  if (d instanceof Date) {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
-  }
-  return String(d).slice(0, 10);
-}
+import { money, slug, toDateInputValue as dstr } from '../../../lib/format';
 
 const STATUSES = ['Quoted', 'Scheduled', 'In Progress', 'Complete'];
 const PRIORITIES = ['High', 'Medium', 'Low'];
 const JOB_TYPES = ['Call Out', 'Scheduled / Preventative Maintenance', 'Quoted Job'];
 
-export default function JobsApp({ initialJobs, clients, laborByJob, fullAccess, canManageJobs }) {
+export default function JobsApp({ initialJobs, clients, assets, laborByJob, fullAccess, canManageJobs }) {
   const [jobs, setJobs] = useState(initialJobs);
   const [statusFilter, setStatusFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
@@ -38,14 +24,16 @@ export default function JobsApp({ initialJobs, clients, laborByJob, fullAccess, 
   }
 
   function emptyJob() {
-    return { clientName: '', jobDescription: '', scheduledDate: '', status: 'Quoted', priority: 'Medium', jobType: 'Quoted Job', amountInvoiced: 0, amountPaid: 0, notes: '' };
+    return { clientId: '', clientName: '', assetId: '', jobDescription: '', scheduledDate: '', status: 'Quoted', priority: 'Medium', jobType: 'Quoted Job', amountInvoiced: 0, amountPaid: 0, notes: '' };
   }
 
   function openNew() { setModal(emptyJob()); }
   function openEdit(j) {
     setModal({
       id: j.id,
+      clientId: j.client_id || '',
       clientName: j.client_name,
+      assetId: j.asset_id || '',
       jobDescription: j.job_description || '',
       scheduledDate: dstr(j.scheduled_date),
       status: j.status,
@@ -57,6 +45,17 @@ export default function JobsApp({ initialJobs, clients, laborByJob, fullAccess, 
       jobNumber: j.job_number
     });
   }
+
+  // Keeps clientId in sync with whatever name is typed/picked from the
+  // customer datalist, so jobs are actually foreign-keyed to a client
+  // (previously only client_name text was saved, so a job had no reliable
+  // link back to the client's asset history).
+  function onClientNameChange(name) {
+    const match = clients.find((c) => c.name.toLowerCase() === name.toLowerCase());
+    setModal({ ...modal, clientName: name, clientId: match ? match.id : '', assetId: match ? modal.assetId : '' });
+  }
+
+  const assetsForClient = modal ? assets.filter((a) => a.client_id === modal.clientId) : [];
 
   async function save() {
     if (!modal.clientName.trim()) return toast.error('Client name is required');
@@ -185,7 +184,7 @@ export default function JobsApp({ initialJobs, clients, laborByJob, fullAccess, 
             <div className="grid-2">
               <div className="field">
                 <label>Customer Name *</label>
-                <input list="client-names" disabled={!!modal.id && !canManageJobs} value={modal.clientName} onChange={(e) => setModal({ ...modal, clientName: e.target.value })} />
+                <input list="client-names" disabled={!!modal.id && !canManageJobs} value={modal.clientName} onChange={(e) => onClientNameChange(e.target.value)} />
                 <datalist id="client-names">{clients.map((c) => <option key={c.id} value={c.name} />)}</datalist>
               </div>
               <div className="field">
@@ -196,6 +195,19 @@ export default function JobsApp({ initialJobs, clients, laborByJob, fullAccess, 
             <div className="field">
               <label>Job Description</label>
               <textarea rows={2} disabled={!!modal.id && !canManageJobs} value={modal.jobDescription} onChange={(e) => setModal({ ...modal, jobDescription: e.target.value })} />
+            </div>
+            <div className="field">
+              <label>Asset / Equipment (optional)</label>
+              <select
+                disabled={(!!modal.id && !canManageJobs) || !modal.clientId}
+                value={modal.assetId}
+                onChange={(e) => setModal({ ...modal, assetId: e.target.value })}
+              >
+                <option value="">
+                  {modal.clientId ? '— Not tied to a specific asset —' : 'Pick a customer with saved assets first'}
+                </option>
+                {assetsForClient.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+              </select>
             </div>
             <div className="grid-2">
               <div className="field">

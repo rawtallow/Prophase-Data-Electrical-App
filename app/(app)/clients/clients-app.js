@@ -2,10 +2,12 @@
 import { useState } from 'react';
 import { toast, confirmDialog } from '../ui-feedback';
 import Modal from '../modal';
+import { slug } from '../../../lib/format';
 
-export default function ClientsApp({ initialClients, initialAssets, canManage }) {
+export default function ClientsApp({ initialClients, initialAssets, jobsByAsset, canManage }) {
   const [clients, setClients] = useState(initialClients);
   const [assets, setAssets] = useState(initialAssets);
+  const [search, setSearch] = useState('');
 
   const [clientModal, setClientModal] = useState(null); // null | {} | {id,...}
   const [assetModal, setAssetModal] = useState(null); // null | { client, editingAsset }
@@ -123,15 +125,29 @@ export default function ClientsApp({ initialClients, initialAssets, canManage })
 
   const clientAssets = assetModal ? assets.filter((a) => a.client_id === assetModal.client.id) : [];
 
+  const filteredClients = clients.filter((c) => {
+    if (!search) return true;
+    const s = search.toLowerCase();
+    return (
+      c.name.toLowerCase().includes(s) ||
+      (c.phone || '').toLowerCase().includes(s) ||
+      (c.email || '').toLowerCase().includes(s) ||
+      (c.address || '').toLowerCase().includes(s)
+    );
+  });
+
   return (
     <>
       <div className="toolbar">
         <h2 className="section-title" style={{ margin: 0 }}>Clients</h2>
-        {canManage && (
-          <button className="btn amber sm" onClick={() => setClientModal({ name: '', phone: '', email: '', address: '' })}>
-            + New Client
-          </button>
-        )}
+        <div className="filters">
+          <input placeholder="Search name, phone, email, address" value={search} onChange={(e) => setSearch(e.target.value)} />
+          {canManage && (
+            <button className="btn amber sm" onClick={() => setClientModal({ name: '', phone: '', email: '', address: '' })}>
+              + New Client
+            </button>
+          )}
+        </div>
       </div>
       <div className="panel">
         <table>
@@ -142,7 +158,7 @@ export default function ClientsApp({ initialClients, initialAssets, canManage })
             </tr>
           </thead>
           <tbody>
-            {clients.map((c) => (
+            {filteredClients.map((c) => (
               <tr key={c.id}>
                 <td>{c.name}</td>
                 <td>{c.phone || '—'}</td>
@@ -168,7 +184,9 @@ export default function ClientsApp({ initialClients, initialAssets, canManage })
             ))}
           </tbody>
         </table>
-        {clients.length === 0 && <div className="empty">No clients yet.</div>}
+        {filteredClients.length === 0 && (
+          <div className="empty">{clients.length === 0 ? 'No clients yet.' : 'No clients match your search.'}</div>
+        )}
       </div>
 
       <Modal open={!!clientModal}>
@@ -246,15 +264,25 @@ export default function ClientsApp({ initialClients, initialAssets, canManage })
 
             <h2 className="section-title" style={{ marginTop: 20 }}>Existing Assets</h2>
             <table>
-              <thead><tr><th>Name / Type</th><th>Model</th><th>Serial</th><th>Installed</th><th>Warranty Exp.</th>{canManage && <th>Actions</th>}</tr></thead>
+              <thead><tr><th>Name / Type</th><th>Model</th><th>Serial</th><th>Installed</th><th>Warranty Exp.</th><th>Job History</th>{canManage && <th>Actions</th>}</tr></thead>
               <tbody>
-                {clientAssets.map((a) => (
+                {clientAssets.map((a) => {
+                  const history = jobsByAsset[a.id] || [];
+                  return (
                   <tr key={a.id}>
                     <td>{a.name}</td>
                     <td>{a.model || '—'}</td>
                     <td>{a.serial || '—'}</td>
                     <td>{a.install_date ? String(a.install_date).slice(0, 10) : '—'}</td>
                     <td>{a.warranty_expiry ? String(a.warranty_expiry).slice(0, 10) : '—'}</td>
+                    <td>
+                      {history.length === 0 && '—'}
+                      {history.map((j) => (
+                        <div key={j.id} style={{ marginBottom: 4, whiteSpace: 'nowrap' }}>
+                          {j.job_number} <span className={`badge ${slug(j.status)}`}>{j.status}</span>
+                        </div>
+                      ))}
+                    </td>
                     {canManage && (
                       <td>
                         <div className="row-actions">
@@ -266,7 +294,8 @@ export default function ClientsApp({ initialClients, initialAssets, canManage })
                       </td>
                     )}
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
             {clientAssets.length === 0 && <div className="empty">No assets logged for this client yet.</div>}
