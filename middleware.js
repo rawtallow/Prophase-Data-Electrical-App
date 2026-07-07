@@ -11,6 +11,7 @@ const PUBLIC_PATHS = ['/login', '/setup', '/api/auth/login', '/api/setup'];
 const FULL_ACCESS_PREFIXES = [
   '/payroll',
   '/backup',
+  '/statistics',
   '/api/payroll',
   '/api/draws',
   '/api/employees',
