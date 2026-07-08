@@ -10,7 +10,6 @@ import { useEffect, useRef, useState } from 'react';
 // admin/manager who see everything.
 const PRIMARY_ITEMS = [
   { href: '/dashboard', label: 'Dashboard', show: () => true },
-  { href: '/quotes/new', label: 'New Quote', show: () => true },
   { href: '/quotes', label: 'Quotes', show: () => true },
   { href: '/jobs', label: 'Job Log', show: () => true },
   { href: '/parts', label: 'Spare Parts', show: () => true },
