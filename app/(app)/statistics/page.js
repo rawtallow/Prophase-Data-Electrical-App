@@ -3,6 +3,7 @@ import { money } from '../../../lib/format';
 import { fyBounds, fyMonths, fyRangeFromEarliest, fyLabel, currentFYStartYear } from '../../../lib/financial-year';
 import StatisticsNav from './statistics-nav';
 import FySwitcher from './fy-switcher';
+import StatBars from './stat-bars';
 
 function monthKey(d) {
   const dt = new Date(d);
@@ -12,8 +13,13 @@ function monthKey(d) {
 export default async function StatisticsPage({ searchParams }) {
   const fy = searchParams.fy ? Number(searchParams.fy) : currentFYStartYear();
   const { start, end } = fyBounds(fy);
+  // clients.created_at is a timestamp (not a plain date like the other
+  // tables here), so comparing it to `end` directly would clip out any
+  // client created later on the last day — use the next FY's start as an
+  // exclusive upper bound instead.
+  const nextFYStart = fyBounds(fy + 1).start;
 
-  const [earliestRows, quotes, jobs, payrollEntries, draws, laborRows] = await Promise.all([
+  const [earliestRows, quotes, jobs, payrollEntries, draws, laborRows, newClients] = await Promise.all([
     sql`
       select min(d) as d from (
         select date as d from quotes
@@ -32,7 +38,8 @@ export default async function StatisticsPage({ searchParams }) {
       join payroll_entries pe on pe.id = pa.payroll_entry_id
       where pa.job_id is not null
       group by pa.job_id
-    `
+    `,
+    sql`select lead_source from clients where created_at >= ${start} and created_at < ${nextFYStart}`
   ]);
   const years = fyRangeFromEarliest(earliestRows[0]?.d);
   const laborByJob = Object.fromEntries(laborRows.map((r) => [r.job_id, Number(r.cost) || 0]));
@@ -50,6 +57,15 @@ export default async function StatisticsPage({ searchParams }) {
 
   const totalGrossPay = payrollEntries.reduce((s, p) => s + Number(p.gross_pay), 0);
   const totalDraws = draws.reduce((s, d) => s + Number(d.amount), 0);
+
+  const sourceCounts = {};
+  for (const c of newClients) {
+    const k = c.lead_source || 'Not set';
+    sourceCounts[k] = (sourceCounts[k] || 0) + 1;
+  }
+  const bySource = Object.keys(sourceCounts)
+    .map((k) => ({ label: k, count: sourceCounts[k] }))
+    .sort((a, b) => b.count - a.count);
 
   const months = fyMonths(fy);
   const monthly = months.map((m) => {
@@ -82,6 +98,7 @@ export default async function StatisticsPage({ searchParams }) {
         <div className="card"><div className="label">Quote Acceptance Rate</div><div className="value">{acceptanceRate === null ? '—' : `${acceptanceRate.toFixed(0)}%`}</div></div>
         <div className="card"><div className="label">Labor Cost (Payroll)</div><div className="value">{money(totalGrossPay)}</div></div>
         <div className="card"><div className="label">Owner Draws</div><div className="value">{money(totalDraws)}</div></div>
+        <div className="card"><div className="label">New Clients</div><div className="value">{newClients.length}</div></div>
       </div>
 
       <div className="panel">
@@ -105,6 +122,11 @@ export default async function StatisticsPage({ searchParams }) {
             ))}
           </tbody>
         </table>
+      </div>
+
+      <div className="panel">
+        <h2 className="section-title">New Clients by Lead Source</h2>
+        <StatBars rows={bySource} />
       </div>
     </>
   );

@@ -3,11 +3,13 @@ import { useState } from 'react';
 import { toast, confirmDialog } from '../ui-feedback';
 import Modal from '../modal';
 import { slug } from '../../../lib/format';
+import { LEAD_SOURCES } from '../../../lib/lead-sources';
 
 export default function ClientsApp({ initialClients, initialAssets, jobsByAsset, canManage }) {
   const [clients, setClients] = useState(initialClients);
   const [assets, setAssets] = useState(initialAssets);
   const [search, setSearch] = useState('');
+  const [sourceFilter, setSourceFilter] = useState('');
 
   const [clientModal, setClientModal] = useState(null); // null | {} | {id,...}
   const [assetModal, setAssetModal] = useState(null); // null | { client, editingAsset }
@@ -126,6 +128,7 @@ export default function ClientsApp({ initialClients, initialAssets, jobsByAsset,
   const clientAssets = assetModal ? assets.filter((a) => a.client_id === assetModal.client.id) : [];
 
   const filteredClients = clients.filter((c) => {
+    if (sourceFilter && c.lead_source !== sourceFilter) return false;
     if (!search) return true;
     const s = search.toLowerCase();
     return (
@@ -141,9 +144,13 @@ export default function ClientsApp({ initialClients, initialAssets, jobsByAsset,
       <div className="toolbar">
         <h2 className="section-title" style={{ margin: 0 }}>Clients</h2>
         <div className="filters">
+          <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}>
+            <option value="">All Sources</option>
+            {LEAD_SOURCES.map((s) => <option key={s}>{s}</option>)}
+          </select>
           <input placeholder="Search name, phone, email, address" value={search} onChange={(e) => setSearch(e.target.value)} />
           {canManage && (
-            <button className="btn amber sm" onClick={() => setClientModal({ name: '', phone: '', email: '', address: '' })}>
+            <button className="btn amber sm" onClick={() => setClientModal({ name: '', phone: '', email: '', address: '', leadSource: '' })}>
               + New Client
             </button>
           )}
@@ -153,7 +160,7 @@ export default function ClientsApp({ initialClients, initialAssets, jobsByAsset,
         <table>
           <thead>
             <tr>
-              <th>Name</th><th>Phone</th><th>Email</th><th>Address</th>
+              <th>Name</th><th>Phone</th><th>Email</th><th>Address</th><th>Source</th>
               <th className="num"># Assets</th><th>Actions</th>
             </tr>
           </thead>
@@ -164,11 +171,12 @@ export default function ClientsApp({ initialClients, initialAssets, jobsByAsset,
                 <td>{c.phone || '—'}</td>
                 <td>{c.email || '—'}</td>
                 <td>{c.address || '—'}</td>
+                <td>{c.lead_source ? <span className={`badge ${slug(c.lead_source)}`}>{c.lead_source}</span> : '—'}</td>
                 <td className="num">{assets.filter((a) => a.client_id === c.id).length}</td>
                 <td>
                   <div className="row-actions">
                     {canManage && (
-                      <button className="btn ghost sm" disabled={busyId === c.id} onClick={() => setClientModal({ id: c.id, name: c.name, phone: c.phone, email: c.email, address: c.address })}>
+                      <button className="btn ghost sm" disabled={busyId === c.id} onClick={() => setClientModal({ id: c.id, name: c.name, phone: c.phone, email: c.email, address: c.address, leadSource: c.lead_source || '' })}>
                         Edit
                       </button>
                     )}
@@ -207,9 +215,18 @@ export default function ClientsApp({ initialClients, initialAssets, jobsByAsset,
                 <input value={clientModal.email || ''} onChange={(e) => setClientModal({ ...clientModal, email: e.target.value })} />
               </div>
             </div>
-            <div className="field">
-              <label>Address</label>
-              <input value={clientModal.address || ''} onChange={(e) => setClientModal({ ...clientModal, address: e.target.value })} />
+            <div className="grid-2">
+              <div className="field">
+                <label>Address</label>
+                <input value={clientModal.address || ''} onChange={(e) => setClientModal({ ...clientModal, address: e.target.value })} />
+              </div>
+              <div className="field">
+                <label>How did they find us?</label>
+                <select value={clientModal.leadSource || ''} onChange={(e) => setClientModal({ ...clientModal, leadSource: e.target.value })}>
+                  <option value="">— Not set —</option>
+                  {LEAD_SOURCES.map((s) => <option key={s}>{s}</option>)}
+                </select>
+              </div>
             </div>
             <div className="modal-actions">
               <button className="btn ghost" disabled={savingClient} onClick={() => setClientModal(null)}>Cancel</button>

@@ -12,10 +12,12 @@ const FULL_ACCESS_PREFIXES = [
   '/payroll',
   '/backup',
   '/statistics',
+  '/maintenance',
   '/api/payroll',
   '/api/draws',
   '/api/employees',
-  '/api/backup'
+  '/api/backup',
+  '/api/maintenance-contracts'
 ];
 
 // Admin-only paths.

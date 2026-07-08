@@ -27,6 +27,7 @@ create table if not exists clients (
   phone text default '',
   email text default '',
   address text default '',
+  lead_source text default '',
   created_at timestamptz not null default now()
 );
 
@@ -195,5 +196,43 @@ create table if not exists compliance_records (
   file_url text,
   notes text default '',
   uploaded_by text not null default '',
+  created_at timestamptz not null default now()
+);
+
+-- Business-wide license/insurance renewal dates — distinct from the
+-- per-employee license register above. Always exactly one row (id=1);
+-- read by anyone, edited by admin/manager only (see app/api/business-settings).
+create table if not exists business_settings (
+  id int primary key default 1,
+  contractor_license_number text default '',
+  contractor_license_expiry date,
+  public_liability_provider text default '',
+  public_liability_expiry date,
+  workers_comp_provider text default '',
+  workers_comp_expiry date,
+  updated_by text default '',
+  updated_at timestamptz default now(),
+  constraint business_settings_single_row check (id = 1)
+);
+insert into business_settings (id) values (1) on conflict (id) do nothing;
+
+-- Recurring service agreements (e.g. "Quarterly RCD Testing" for a
+-- commercial client) — the mechanism for turning one-off job income into
+-- a predictable, scheduled workload. next_due_date advances by `frequency`
+-- each time a job is generated from the contract (see
+-- app/api/maintenance-contracts/[id]/generate-job).
+create table if not exists maintenance_contracts (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid references clients(id),
+  client_name text not null,
+  title text not null default '',
+  description text default '',
+  frequency text not null default 'Quarterly',
+  start_date date not null default current_date,
+  next_due_date date not null,
+  amount numeric not null default 0,
+  status text not null default 'Active',
+  notes text default '',
+  created_by text default '',
   created_at timestamptz not null default now()
 );

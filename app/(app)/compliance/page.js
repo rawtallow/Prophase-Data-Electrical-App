@@ -5,7 +5,7 @@ import ComplianceApp from './compliance-app';
 export default async function CompliancePage() {
   const session = await getSession();
 
-  const [records, jobs, clients, employees] = await Promise.all([
+  const [records, jobs, clients, employees, businessSettingsRows] = await Promise.all([
     sql`
       select cr.*, j.job_number, c.name as client_name, e.name as employee_name
       from compliance_records cr
@@ -18,7 +18,8 @@ export default async function CompliancePage() {
     sql`select id, name from clients order by name asc`,
     // Safe columns only — this page is visible to every role, and hourly_rate
     // is financial info that shouldn't leak to non-manager/admin sessions.
-    sql`select id, name, status, license_number, license_expiry from employees where status = 'Active' order by name asc`
+    sql`select id, name, status, license_number, license_expiry from employees where status = 'Active' order by name asc`,
+    sql`select * from business_settings where id = 1`
   ]);
 
   return (
@@ -27,6 +28,7 @@ export default async function CompliancePage() {
       jobs={jobs}
       clients={clients}
       employees={employees}
+      initialBusinessSettings={businessSettingsRows[0]}
       canManage={CAN.manageCompliance(session.role)}
     />
   );

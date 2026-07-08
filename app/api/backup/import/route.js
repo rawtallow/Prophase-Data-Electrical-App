@@ -25,8 +25,10 @@ export async function POST(req) {
   // tagged calls are lazy until awaited), then run them atomically.
   const queries = [
     // Delete children first to satisfy foreign keys. compliance_records
-    // references jobs/clients/employees, so it must go before all three.
+    // references jobs/clients/employees, so it must go before all three;
+    // maintenance_contracts references clients, so before clients too.
     sql`delete from compliance_records`,
+    sql`delete from maintenance_contracts`,
     sql`delete from payroll_allocations`,
     sql`delete from payroll_entries`,
     sql`delete from quote_line_items`,
@@ -41,7 +43,10 @@ export async function POST(req) {
   ];
 
   for (const c of data.clients) {
-    queries.push(sql`insert into clients (id, name, phone, email, address, created_at) values (${c.id}, ${c.name}, ${c.phone}, ${c.email}, ${c.address}, ${c.created_at})`);
+    queries.push(sql`
+      insert into clients (id, name, phone, email, address, lead_source, created_at)
+      values (${c.id}, ${c.name}, ${c.phone}, ${c.email}, ${c.address}, ${c.lead_source || ''}, ${c.created_at})
+    `);
   }
   for (const e of data.employees) {
     queries.push(sql`
@@ -120,6 +125,31 @@ export async function POST(req) {
         values (${cr.id}, ${cr.type}, ${cr.job_id}, ${cr.client_id}, ${cr.employee_id}, ${cr.record_date}, ${cr.reference_number}, ${cr.result}, ${cr.retest_due}, ${cr.description}, ${cr.file_url}, ${cr.notes}, ${cr.uploaded_by}, ${cr.created_at})
       `);
     }
+  }
+  if (Array.isArray(data.maintenanceContracts)) {
+    for (const mc of data.maintenanceContracts) {
+      queries.push(sql`
+        insert into maintenance_contracts (id, client_id, client_name, title, description, frequency, start_date, next_due_date, amount, status, notes, created_by, created_at)
+        values (${mc.id}, ${mc.client_id}, ${mc.client_name}, ${mc.title}, ${mc.description || ''}, ${mc.frequency || 'Quarterly'},
+          ${mc.start_date}, ${mc.next_due_date}, ${mc.amount || 0}, ${mc.status || 'Active'}, ${mc.notes || ''}, ${mc.created_by || ''}, ${mc.created_at})
+      `);
+    }
+  }
+  // Singleton settings row (always id=1, never wiped above) — upsert rather
+  // than insert, and only if the backup actually has it (older backups won't).
+  if (Array.isArray(data.businessSettings) && data.businessSettings[0]) {
+    const bs = data.businessSettings[0];
+    queries.push(sql`
+      update business_settings set
+        contractor_license_number = ${bs.contractor_license_number || ''},
+        contractor_license_expiry = ${bs.contractor_license_expiry || null},
+        public_liability_provider = ${bs.public_liability_provider || ''},
+        public_liability_expiry = ${bs.public_liability_expiry || null},
+        workers_comp_provider = ${bs.workers_comp_provider || ''},
+        workers_comp_expiry = ${bs.workers_comp_expiry || null},
+        updated_by = ${bs.updated_by || ''}
+      where id = 1
+    `);
   }
 
   try {

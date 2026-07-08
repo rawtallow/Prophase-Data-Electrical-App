@@ -6,6 +6,15 @@ import Modal from '../modal';
 import { money, slug, toDateInputValue as dstr } from '../../../lib/format';
 
 const APPROVAL_STATUSES = ['Pending Approval', 'Approved', 'Rejected'];
+const STALE_DAYS = 10;
+
+// A quote that's sat in Draft/Sent for a while without being accepted or
+// declined is easy to forget about — flag it so it doesn't just go cold.
+function isStale(q) {
+  if (q.status !== 'Draft' && q.status !== 'Sent') return false;
+  const days = (Date.now() - new Date(q.date)) / 86400000;
+  return days >= STALE_DAYS;
+}
 
 export default function QuotesApp({ initialQuotes, myId, fullAccess }) {
   const router = useRouter();
@@ -110,8 +119,18 @@ export default function QuotesApp({ initialQuotes, myId, fullAccess }) {
     return true;
   });
 
+  const staleCount = quotes.filter(isStale).length;
+
   return (
     <>
+      {staleCount > 0 && (
+        <div className="cards" style={{ marginBottom: 14 }}>
+          <div className="card warn">
+            <div className="label">Needs Follow-Up ({STALE_DAYS}+ Days, No Response)</div>
+            <div className="value">{staleCount}</div>
+          </div>
+        </div>
+      )}
       <div className="toolbar">
         <h2 className="section-title" style={{ margin: 0 }}>Quotes</h2>
         <div className="filters">
@@ -144,7 +163,10 @@ export default function QuotesApp({ initialQuotes, myId, fullAccess }) {
                 <tr key={q.id}>
                   <td>{q.quote_number}</td>
                   <td>{q.client_name}</td>
-                  <td>{dstr(q.date)}</td>
+                  <td>
+                    {dstr(q.date)}
+                    {isStale(q) && <div className="small-note" style={{ color: 'var(--red)', fontWeight: 700 }}>Follow up</div>}
+                  </td>
                   <td>
                     <span className={`badge ${slug(q.approval_status)}`}>{q.approval_status}</span>
                     {q.approval_status === 'Rejected' && q.approval_note && (

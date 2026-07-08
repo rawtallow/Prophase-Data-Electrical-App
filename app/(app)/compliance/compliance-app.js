@@ -27,17 +27,52 @@ function licenseWarning(expiry) {
   return null;
 }
 
-export default function ComplianceApp({ initialRecords, jobs, clients, employees, canManage }) {
+export default function ComplianceApp({ initialRecords, jobs, clients, employees, initialBusinessSettings, canManage }) {
   const [records, setRecords] = useState(initialRecords);
   const [typeFilter, setTypeFilter] = useState('');
   const [search, setSearch] = useState('');
   const [modal, setModal] = useState(null);
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState(null);
+  const [biz, setBiz] = useState(initialBusinessSettings);
+  const [bizModal, setBizModal] = useState(null);
+  const [savingBiz, setSavingBiz] = useState(false);
 
   async function refresh() {
     const rows = await fetch('/api/compliance').then((r) => r.json());
     setRecords(rows);
+  }
+
+  function openBizEdit() {
+    setBizModal({
+      contractorLicenseNumber: biz.contractor_license_number || '',
+      contractorLicenseExpiry: dstr(biz.contractor_license_expiry),
+      publicLiabilityProvider: biz.public_liability_provider || '',
+      publicLiabilityExpiry: dstr(biz.public_liability_expiry),
+      workersCompProvider: biz.workers_comp_provider || '',
+      workersCompExpiry: dstr(biz.workers_comp_expiry)
+    });
+  }
+
+  async function saveBiz() {
+    setSavingBiz(true);
+    try {
+      const res = await fetch('/api/business-settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(bizModal)
+      });
+      if (res.ok) {
+        setBiz(await res.json());
+        toast.success('Business details updated');
+        setBizModal(null);
+      } else {
+        const d = await res.json().catch(() => ({}));
+        toast.error(d.error || 'Could not save business details');
+      }
+    } finally {
+      setSavingBiz(false);
+    }
   }
 
   function emptyRecord() {
@@ -139,13 +174,65 @@ export default function ComplianceApp({ initialRecords, jobs, clients, employees
 
   const dueSoonCount = records.filter((r) => dueSoon(r.retest_due)).length;
   const expiringLicenses = employees.filter((e) => licenseWarning(e.license_expiry));
+  const bizExpiries = [
+    { label: 'Contractor License', expiry: biz.contractor_license_expiry },
+    { label: 'Public Liability Insurance', expiry: biz.public_liability_expiry },
+    { label: 'Workers Comp Insurance', expiry: biz.workers_comp_expiry }
+  ];
+  const bizWarningCount = bizExpiries.filter((b) => licenseWarning(b.expiry)).length;
+  const totalExpiringSoon = expiringLicenses.length + bizWarningCount;
 
   return (
     <>
       <div className="cards">
         <div className="card"><div className="label">Records Logged</div><div className="value">{records.length}</div></div>
         <div className={`card${dueSoonCount ? ' warn' : ''}`}><div className="label">Retests Due Soon / Overdue</div><div className="value">{dueSoonCount}</div></div>
-        <div className={`card${expiringLicenses.length ? ' warn' : ''}`}><div className="label">Licenses Expiring Soon</div><div className="value">{expiringLicenses.length}</div></div>
+        <div className={`card${totalExpiringSoon ? ' warn' : ''}`}><div className="label">Licenses / Insurance Expiring Soon</div><div className="value">{totalExpiringSoon}</div></div>
+      </div>
+
+      <div className="panel">
+        <div className="toolbar" style={{ marginBottom: 12 }}>
+          <h2 className="section-title" style={{ margin: 0 }}>Business License &amp; Insurance</h2>
+          {canManage && <button className="btn ghost sm" onClick={openBizEdit}>Edit</button>}
+        </div>
+        <table>
+          <thead><tr><th>Item</th><th>Provider / Number</th><th>Expiry</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>Contractor License</td>
+              <td>{biz.contractor_license_number || '—'}</td>
+              <td>
+                {biz.contractor_license_expiry ? (
+                  <span className={`badge ${licenseWarning(biz.contractor_license_expiry) ? 'lowstock' : 'instock'}`}>
+                    {licenseWarning(biz.contractor_license_expiry) === 'expired' ? 'Expired' : licenseWarning(biz.contractor_license_expiry) === 'expiring' ? 'Expiring Soon' : 'Valid'} {dstr(biz.contractor_license_expiry)}
+                  </span>
+                ) : '—'}
+              </td>
+            </tr>
+            <tr>
+              <td>Public Liability Insurance</td>
+              <td>{biz.public_liability_provider || '—'}</td>
+              <td>
+                {biz.public_liability_expiry ? (
+                  <span className={`badge ${licenseWarning(biz.public_liability_expiry) ? 'lowstock' : 'instock'}`}>
+                    {licenseWarning(biz.public_liability_expiry) === 'expired' ? 'Expired' : licenseWarning(biz.public_liability_expiry) === 'expiring' ? 'Expiring Soon' : 'Valid'} {dstr(biz.public_liability_expiry)}
+                  </span>
+                ) : '—'}
+              </td>
+            </tr>
+            <tr>
+              <td>Workers Comp Insurance</td>
+              <td>{biz.workers_comp_provider || '—'}</td>
+              <td>
+                {biz.workers_comp_expiry ? (
+                  <span className={`badge ${licenseWarning(biz.workers_comp_expiry) ? 'lowstock' : 'instock'}`}>
+                    {licenseWarning(biz.workers_comp_expiry) === 'expired' ? 'Expired' : licenseWarning(biz.workers_comp_expiry) === 'expiring' ? 'Expiring Soon' : 'Valid'} {dstr(biz.workers_comp_expiry)}
+                  </span>
+                ) : '—'}
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
 
       <div className="panel">
@@ -316,6 +403,48 @@ export default function ComplianceApp({ initialRecords, jobs, clients, employees
             <div className="modal-actions">
               <button className="btn ghost" disabled={saving} onClick={() => setModal(null)}>Cancel</button>
               <button className="btn amber" disabled={saving} onClick={save}>{saving ? 'Saving…' : 'Save Record'}</button>
+            </div>
+          </>
+        )}
+      </Modal>
+
+      <Modal open={!!bizModal}>
+        {bizModal && (
+          <>
+            <h3>Edit Business License &amp; Insurance</h3>
+            <div className="grid-2">
+              <div className="field">
+                <label>Contractor License Number</label>
+                <input value={bizModal.contractorLicenseNumber} onChange={(e) => setBizModal({ ...bizModal, contractorLicenseNumber: e.target.value })} />
+              </div>
+              <div className="field">
+                <label>License Expiry</label>
+                <input type="date" value={bizModal.contractorLicenseExpiry} onChange={(e) => setBizModal({ ...bizModal, contractorLicenseExpiry: e.target.value })} />
+              </div>
+            </div>
+            <div className="grid-2">
+              <div className="field">
+                <label>Public Liability Insurer</label>
+                <input value={bizModal.publicLiabilityProvider} onChange={(e) => setBizModal({ ...bizModal, publicLiabilityProvider: e.target.value })} />
+              </div>
+              <div className="field">
+                <label>Public Liability Expiry</label>
+                <input type="date" value={bizModal.publicLiabilityExpiry} onChange={(e) => setBizModal({ ...bizModal, publicLiabilityExpiry: e.target.value })} />
+              </div>
+            </div>
+            <div className="grid-2">
+              <div className="field">
+                <label>Workers Comp Insurer</label>
+                <input value={bizModal.workersCompProvider} onChange={(e) => setBizModal({ ...bizModal, workersCompProvider: e.target.value })} />
+              </div>
+              <div className="field">
+                <label>Workers Comp Expiry</label>
+                <input type="date" value={bizModal.workersCompExpiry} onChange={(e) => setBizModal({ ...bizModal, workersCompExpiry: e.target.value })} />
+              </div>
+            </div>
+            <div className="modal-actions">
+              <button className="btn ghost" disabled={savingBiz} onClick={() => setBizModal(null)}>Cancel</button>
+              <button className="btn amber" disabled={savingBiz} onClick={saveBiz}>{savingBiz ? 'Saving…' : 'Save'}</button>
             </div>
           </>
         )}

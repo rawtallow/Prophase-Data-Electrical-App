@@ -9,12 +9,12 @@ export async function PUT(req, { params }) {
   if (!session || !CAN.manageClients(session.role)) {
     return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
   }
-  const { name, phone, email, address } = await req.json();
+  const { name, phone, email, address, leadSource } = await req.json();
   if (!name || !name.trim()) {
     return NextResponse.json({ error: 'Name is required' }, { status: 400 });
   }
   const rows = await sql`
-    update clients set name = ${name}, phone = ${phone || ''}, email = ${email || ''}, address = ${address || ''}
+    update clients set name = ${name}, phone = ${phone || ''}, email = ${email || ''}, address = ${address || ''}, lead_source = ${leadSource || ''}
     where id = ${params.id}
     returning *
   `;
