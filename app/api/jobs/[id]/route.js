@@ -11,6 +11,10 @@ export async function PUT(req, { params }) {
   const body = await req.json();
   const fullAccess = CAN.viewFinancials(session.role);
 
+  // Stamps completed_date the first time status becomes 'Complete', and
+  // clears it if the job is moved off Complete again — keeps the Workmanship
+  // Warranty document's completion/expiry dates trustworthy rather than
+  // reflecting whenever the job happened to be last edited.
   if (fullAccess) {
     const { clientId, assetId, clientName, jobDescription, scheduledDate, status, priority, jobType, amountInvoiced, amountPaid, notes } = body;
     const rows = await sql`
@@ -20,7 +24,12 @@ export async function PUT(req, { params }) {
         scheduled_date = ${scheduledDate || null}, status = ${status},
         priority = ${priority || 'Medium'}, job_type = ${jobType || 'Quoted Job'},
         amount_invoiced = ${Number(amountInvoiced) || 0}, amount_paid = ${Number(amountPaid) || 0},
-        notes = ${notes || ''}
+        notes = ${notes || ''},
+        completed_date = case
+          when ${status} = 'Complete' and completed_date is null then current_date
+          when ${status} != 'Complete' then null
+          else completed_date
+        end
       where id = ${params.id}
       returning *
     `;
@@ -32,7 +41,12 @@ export async function PUT(req, { params }) {
   const { scheduledDate, status, priority, notes } = body;
   const rows = await sql`
     update jobs set
-      scheduled_date = ${scheduledDate || null}, status = ${status}, priority = ${priority || 'Medium'}, notes = ${notes || ''}
+      scheduled_date = ${scheduledDate || null}, status = ${status}, priority = ${priority || 'Medium'}, notes = ${notes || ''},
+      completed_date = case
+        when ${status} = 'Complete' and completed_date is null then current_date
+        when ${status} != 'Complete' then null
+        else completed_date
+      end
     where id = ${params.id}
     returning *
   `;

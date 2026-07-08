@@ -98,7 +98,11 @@ create table if not exists jobs (
   amount_invoiced numeric not null default 0,
   amount_paid numeric not null default 0,
   notes text default '',
-  created_date date not null default current_date
+  created_date date not null default current_date,
+  -- Stamped automatically when status first transitions to 'Complete' (see
+  -- app/api/jobs/[id]/route.js), not user-editable. Drives the Workmanship
+  -- Warranty document's completion/expiry dates.
+  completed_date date
 );
 
 create table if not exists employees (

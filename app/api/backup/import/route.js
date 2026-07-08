@@ -79,9 +79,9 @@ export async function POST(req) {
   for (const j of data.jobs) {
     queries.push(sql`
       insert into jobs (id, job_number, quote_id, client_id, asset_id, client_name, job_description, scheduled_date, status,
-        priority, job_type, amount_invoiced, amount_paid, notes, created_date)
+        priority, job_type, amount_invoiced, amount_paid, notes, created_date, completed_date)
       values (${j.id}, ${j.job_number}, ${j.quote_id}, ${j.client_id}, ${j.asset_id || null}, ${j.client_name}, ${j.job_description}, ${j.scheduled_date},
-        ${j.status}, ${j.priority || 'Medium'}, ${j.job_type || 'Quoted Job'}, ${j.amount_invoiced}, ${j.amount_paid}, ${j.notes}, ${j.created_date})
+        ${j.status}, ${j.priority || 'Medium'}, ${j.job_type || 'Quoted Job'}, ${j.amount_invoiced}, ${j.amount_paid}, ${j.notes}, ${j.created_date}, ${j.completed_date || null})
     `);
   }
   for (const pe of data.payrollEntries) {

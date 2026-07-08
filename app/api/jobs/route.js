@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { sql } from '../../../lib/db';
 import { getSession, CAN } from '../../../lib/auth';
+import { toDateInputValue } from '../../../lib/format';
 
 export const runtime = 'nodejs';
 
@@ -30,10 +31,12 @@ export async function POST(req) {
     return NextResponse.json({ error: 'Client is required' }, { status: 400 });
   }
   const jobNumber = await nextJobNumber();
+  const initialStatus = status || 'Quoted';
   const rows = await sql`
-    insert into jobs (job_number, quote_id, client_id, asset_id, client_name, job_description, scheduled_date, status, priority, job_type, amount_invoiced, amount_paid, notes)
+    insert into jobs (job_number, quote_id, client_id, asset_id, client_name, job_description, scheduled_date, status, priority, job_type, amount_invoiced, amount_paid, notes, completed_date)
     values (${jobNumber}, ${quoteId || null}, ${clientId || null}, ${assetId || null}, ${clientName.trim()}, ${jobDescription || ''}, ${scheduledDate || null},
-      ${status || 'Quoted'}, ${priority || 'Medium'}, ${jobType || 'Quoted Job'}, ${Number(amountInvoiced) || 0}, ${Number(amountPaid) || 0}, ${notes || ''})
+      ${initialStatus}, ${priority || 'Medium'}, ${jobType || 'Quoted Job'}, ${Number(amountInvoiced) || 0}, ${Number(amountPaid) || 0}, ${notes || ''},
+      ${initialStatus === 'Complete' ? toDateInputValue(new Date()) : null})
     returning *
   `;
   return NextResponse.json(rows[0]);

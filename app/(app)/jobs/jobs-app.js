@@ -166,6 +166,9 @@ export default function JobsApp({ initialJobs, clients, assets, laborByJob, full
                   <td>
                     <div className="row-actions">
                       <button className="btn ghost sm" disabled={busy} onClick={() => openEdit(j)}>Edit</button>
+                      {fullAccess && j.status === 'Complete' && (
+                        <a className="btn ghost sm" href={`/api/jobs/${j.id}/warranty`}>Warranty</a>
+                      )}
                       {canManageJobs && <button className="btn danger sm" disabled={busy} onClick={() => del(j.id)}>{busy ? 'Deleting…' : 'Delete'}</button>}
                     </div>
                   </td>

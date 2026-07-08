@@ -13,11 +13,13 @@ const FULL_ACCESS_PREFIXES = [
   '/backup',
   '/statistics',
   '/maintenance',
+  '/documents',
   '/api/payroll',
   '/api/draws',
   '/api/employees',
   '/api/backup',
-  '/api/maintenance-contracts'
+  '/api/maintenance-contracts',
+  '/api/documents'
 ];
 
 // Admin-only paths.
@@ -34,6 +36,16 @@ function matches(pathname, prefixes) {
 // blocked for them regardless of the quote's approval state.
 function isQuotePrint(pathname) {
   return /^\/quotes\/[^/]+\/print(\/.*)?$/.test(pathname);
+}
+// Same reasoning as isQuotePrint: the generated Work Agreement and
+// Workmanship Warranty are customer-facing deliverables, so they stay
+// blocked for employees even though /api/quotes and /api/jobs themselves
+// are open to all roles.
+function isQuoteAgreement(pathname) {
+  return /^\/api\/quotes\/[^/]+\/agreement$/.test(pathname);
+}
+function isJobWarranty(pathname) {
+  return /^\/api\/jobs\/[^/]+\/warranty$/.test(pathname);
 }
 
 export async function middleware(req) {
@@ -61,6 +73,10 @@ export async function middleware(req) {
 
   if (isQuotePrint(pathname) && session.role === 'employee') {
     return NextResponse.redirect(new URL('/quotes?denied=1', req.url));
+  }
+
+  if ((isQuoteAgreement(pathname) || isJobWarranty(pathname)) && session.role === 'employee') {
+    return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
   }
 
   return NextResponse.next();
