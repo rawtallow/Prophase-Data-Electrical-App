@@ -94,7 +94,7 @@ export default function PartsApp({ initialParts, canManage }) {
           {canManage && <button className="btn amber sm" onClick={openNew}>+ New Part</button>}
         </div>
       </div>
-      <div className="panel">
+      <div className="panel card-table">
         <table>
           <thead>
             <tr>
@@ -109,15 +109,15 @@ export default function PartsApp({ initialParts, canManage }) {
               const busy = busyId === p.id;
               return (
                 <tr key={p.id}>
-                  <td>{p.name}</td>
-                  <td>{p.sku || '—'}</td>
-                  <td>{p.category || '—'}</td>
-                  <td>{p.supplier || '—'}</td>
-                  <td className="num">{money(p.unit_cost)}</td>
-                  <td className="num">{Number(p.qty_on_hand)}</td>
-                  <td className="num">{Number(p.reorder_threshold)}</td>
-                  <td><span className={`badge ${low ? 'lowstock' : 'instock'}`}>{low ? 'Low Stock' : 'OK'}</span></td>
-                  <td>
+                  <td data-label="Name">{p.name}</td>
+                  <td data-label="SKU">{p.sku || '—'}</td>
+                  <td data-label="Category">{p.category || '—'}</td>
+                  <td data-label="Supplier">{p.supplier || '—'}</td>
+                  <td className="num" data-label="Unit Cost">{money(p.unit_cost)}</td>
+                  <td className="num" data-label="Qty on Hand">{Number(p.qty_on_hand)}</td>
+                  <td className="num" data-label="Reorder At">{Number(p.reorder_threshold)}</td>
+                  <td data-label="Status"><span className={`badge ${low ? 'lowstock' : 'instock'}`}>{low ? 'Low Stock' : 'OK'}</span></td>
+                  <td className="cell-actions" data-label="">
                     <div className="row-actions">
                       <button className="btn ghost sm" disabled={busy} onClick={() => adjust(p.id, -1)}>-1</button>
                       <button className="btn ghost sm" disabled={busy} onClick={() => adjust(p.id, 1)}>+1</button>

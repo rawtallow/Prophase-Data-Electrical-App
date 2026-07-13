@@ -146,7 +146,7 @@ export default function QuotesApp({ initialQuotes, myId, fullAccess }) {
           <a className="btn amber sm" href="/quotes/new">+ New Quote</a>
         </div>
       </div>
-      <div className="panel">
+      <div className="panel card-table">
         <table>
           <thead>
             <tr>
@@ -161,22 +161,22 @@ export default function QuotesApp({ initialQuotes, myId, fullAccess }) {
               const canPrint = fullAccess && q.approval_status === 'Approved';
               return (
                 <tr key={q.id}>
-                  <td>{q.quote_number}</td>
-                  <td>{q.client_name}</td>
-                  <td>
+                  <td data-label="Quote #">{q.quote_number}</td>
+                  <td data-label="Customer">{q.client_name}</td>
+                  <td data-label="Date">
                     {dstr(q.date)}
                     {isStale(q) && <div className="small-note" style={{ color: 'var(--red)', fontWeight: 700 }}>Follow up</div>}
                   </td>
-                  <td>
+                  <td data-label="Approval">
                     <span className={`badge ${slug(q.approval_status)}`}>{q.approval_status}</span>
                     {q.approval_status === 'Rejected' && q.approval_note && (
                       <div className="small-note" style={{ marginTop: 4, maxWidth: 200 }}>{q.approval_note}</div>
                     )}
                   </td>
-                  <td><span className={`badge ${slug(q.status)}`}>{q.status}</span></td>
-                  <td className="num">{money(q.total)}</td>
-                  <td>{q.created_by || '—'}</td>
-                  <td>
+                  <td data-label="Status"><span className={`badge ${slug(q.status)}`}>{q.status}</span></td>
+                  <td className="num" data-label="Total">{money(q.total)}</td>
+                  <td data-label="Created By">{q.created_by || '—'}</td>
+                  <td className="cell-actions" data-label="">
                     <div className="row-actions">
                       {canReview && (
                         <button className="btn amber sm" disabled={busy} onClick={() => setReviewModal({ quote: q, note: '' })}>

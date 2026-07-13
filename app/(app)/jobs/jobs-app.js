@@ -130,7 +130,7 @@ export default function JobsApp({ initialJobs, clients, assets, laborByJob, full
           {canManageJobs && <button className="btn amber sm" onClick={openNew}>+ New Job</button>}
         </div>
       </div>
-      <div className="panel">
+      <div className="panel card-table">
         <table>
           <thead>
             <tr>
@@ -147,23 +147,23 @@ export default function JobsApp({ initialJobs, clients, assets, laborByJob, full
               const busy = busyId === j.id;
               return (
                 <tr key={j.id}>
-                  <td>{j.job_number}</td>
-                  <td><span className={`badge ${slug(j.priority)}`}>{j.priority}</span></td>
-                  <td><span className={`badge ${slug(j.job_type)}`}>{j.job_type}</span></td>
-                  <td>{j.client_name}</td>
-                  <td>{j.job_description || '—'}</td>
-                  <td>{dstr(j.scheduled_date) || '—'}</td>
-                  <td><span className={`badge ${slug(j.status)}`}>{j.status}</span></td>
+                  <td data-label="Job #">{j.job_number}</td>
+                  <td data-label="Priority"><span className={`badge ${slug(j.priority)}`}>{j.priority}</span></td>
+                  <td data-label="Type"><span className={`badge ${slug(j.job_type)}`}>{j.job_type}</span></td>
+                  <td data-label="Customer">{j.client_name}</td>
+                  <td data-label="Description">{j.job_description || '—'}</td>
+                  <td data-label="Scheduled">{dstr(j.scheduled_date) || '—'}</td>
+                  <td data-label="Status"><span className={`badge ${slug(j.status)}`}>{j.status}</span></td>
                   {fullAccess && (
                     <>
-                      <td className="num">{money(j.amount_invoiced)}</td>
-                      <td className="num">{money(j.amount_paid)}</td>
-                      <td className="num" style={{ fontWeight: 700, color: balance > 0 ? 'var(--red)' : 'var(--green)' }}>{money(balance)}</td>
-                      <td className="num">{money(labor)}</td>
-                      <td className="num" style={{ color: margin >= 0 ? 'var(--green)' : 'var(--red)' }}>{money(margin)}</td>
+                      <td className="num" data-label="Invoiced">{money(j.amount_invoiced)}</td>
+                      <td className="num" data-label="Paid">{money(j.amount_paid)}</td>
+                      <td className="num" data-label="Balance" style={{ fontWeight: 700, color: balance > 0 ? 'var(--red)' : 'var(--green)' }}>{money(balance)}</td>
+                      <td className="num" data-label="Labor Cost">{money(labor)}</td>
+                      <td className="num" data-label="Margin" style={{ color: margin >= 0 ? 'var(--green)' : 'var(--red)' }}>{money(margin)}</td>
                     </>
                   )}
-                  <td>
+                  <td className="cell-actions" data-label="">
                     <div className="row-actions">
                       <button className="btn ghost sm" disabled={busy} onClick={() => openEdit(j)}>Edit</button>
                       {fullAccess && j.status === 'Complete' && (

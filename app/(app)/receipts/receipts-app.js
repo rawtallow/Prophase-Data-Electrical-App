@@ -228,7 +228,7 @@ export default function ReceiptsApp({ initialReceipts, canManage }) {
         </div>
       </div>
 
-      <div className="panel">
+      <div className="panel card-table">
         <table>
           <thead>
             <tr>
@@ -241,19 +241,19 @@ export default function ReceiptsApp({ initialReceipts, canManage }) {
               const busy = busyId === r.id;
               return (
                 <tr key={r.id}>
-                  <td>
+                  <td data-label="Receipt">
                     <a href={r.image_url} target="_blank" rel="noreferrer">
                       <img src={r.image_url} alt="Receipt" style={{ width: 40, height: 40, borderRadius: 6, objectFit: 'cover', display: 'block' }} />
                     </a>
                   </td>
-                  <td>{fmtDate(r.purchase_date)}</td>
-                  <td>{r.vendor}</td>
-                  <td><span className="badge inactive">{r.category}</span></td>
-                  <td className="num">{money(r.amount)}</td>
-                  <td className="num">{money(r.gst_amount)}</td>
-                  <td>{r.description || '—'}</td>
-                  <td>{r.uploaded_by}</td>
-                  <td>
+                  <td data-label="Date">{fmtDate(r.purchase_date)}</td>
+                  <td data-label="Vendor">{r.vendor}</td>
+                  <td data-label="Category"><span className="badge inactive">{r.category}</span></td>
+                  <td className="num" data-label="Amount">{money(r.amount)}</td>
+                  <td className="num" data-label="GST">{money(r.gst_amount)}</td>
+                  <td data-label="Description">{r.description || '—'}</td>
+                  <td data-label="Uploaded By">{r.uploaded_by}</td>
+                  <td className="cell-actions" data-label="">
                     <div className="row-actions">
                       {canManage && <button className="btn ghost sm" disabled={busy} onClick={() => openEdit(r)}>Edit</button>}
                       {canManage && <button className="btn danger sm" disabled={busy} onClick={() => del(r.id)}>{busy ? 'Deleting…' : 'Delete'}</button>}

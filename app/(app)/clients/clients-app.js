@@ -156,7 +156,7 @@ export default function ClientsApp({ initialClients, initialAssets, jobsByAsset,
           )}
         </div>
       </div>
-      <div className="panel">
+      <div className="panel card-table">
         <table>
           <thead>
             <tr>
@@ -167,13 +167,13 @@ export default function ClientsApp({ initialClients, initialAssets, jobsByAsset,
           <tbody>
             {filteredClients.map((c) => (
               <tr key={c.id}>
-                <td>{c.name}</td>
-                <td>{c.phone || '—'}</td>
-                <td>{c.email || '—'}</td>
-                <td>{c.address || '—'}</td>
-                <td>{c.lead_source ? <span className={`badge ${slug(c.lead_source)}`}>{c.lead_source}</span> : '—'}</td>
-                <td className="num">{assets.filter((a) => a.client_id === c.id).length}</td>
-                <td>
+                <td data-label="Name">{c.name}</td>
+                <td data-label="Phone">{c.phone || '—'}</td>
+                <td data-label="Email">{c.email || '—'}</td>
+                <td data-label="Address">{c.address || '—'}</td>
+                <td data-label="Source">{c.lead_source ? <span className={`badge ${slug(c.lead_source)}`}>{c.lead_source}</span> : '—'}</td>
+                <td className="num" data-label="Assets">{assets.filter((a) => a.client_id === c.id).length}</td>
+                <td className="cell-actions" data-label="">
                   <div className="row-actions">
                     {canManage && (
                       <button className="btn ghost sm" disabled={busyId === c.id} onClick={() => setClientModal({ id: c.id, name: c.name, phone: c.phone, email: c.email, address: c.address, leadSource: c.lead_source || '' })}>

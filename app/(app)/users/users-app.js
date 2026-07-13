@@ -68,18 +68,18 @@ export default function UsersApp({ initialUsers, myId }) {
         Admin and Manager have full access to every feature, including payroll, owner draws, and backups.
         Employee accounts can view/update the Job Log, use Spare Parts, and view client asset info — no pricing, payroll, or client financials.
       </div>
-      <div className="panel">
+      <div className="panel card-table">
         <table>
           <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Created</th><th>Actions</th></tr></thead>
           <tbody>
             {users.map((u) => (
               <tr key={u.id}>
-                <td>{u.name}{u.id === myId ? ' (you)' : ''}</td>
-                <td>{u.email}</td>
-                <td><span className={`badge ${u.role}`}>{u.role}</span></td>
-                <td><span className={`badge ${u.active ? 'activestatus' : 'inactive'}`}>{u.active ? 'Active' : 'Disabled'}</span></td>
-                <td>{fmtDate(u.created_at)}</td>
-                <td>
+                <td data-label="Name">{u.name}{u.id === myId ? ' (you)' : ''}</td>
+                <td data-label="Email">{u.email}</td>
+                <td data-label="Role"><span className={`badge ${u.role}`}>{u.role}</span></td>
+                <td data-label="Status"><span className={`badge ${u.active ? 'activestatus' : 'inactive'}`}>{u.active ? 'Active' : 'Disabled'}</span></td>
+                <td data-label="Created">{fmtDate(u.created_at)}</td>
+                <td className="cell-actions" data-label="">
                   <div className="row-actions">
                     <button className="btn ghost sm" disabled={busyId === u.id} onClick={() => openEdit(u)}>Edit</button>
                     {u.id !== myId && (

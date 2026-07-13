@@ -273,7 +273,7 @@ export default function ComplianceApp({ initialRecords, jobs, clients, employees
         </div>
       </div>
 
-      <div className="panel">
+      <div className="panel card-table">
         <table>
           <thead>
             <tr>
@@ -287,18 +287,18 @@ export default function ComplianceApp({ initialRecords, jobs, clients, employees
               const warn = dueSoon(r.retest_due);
               return (
                 <tr key={r.id}>
-                  <td><span className={`badge ${slug(r.type)}`}>{r.type}</span></td>
-                  <td>{dstr(r.record_date) || '—'}</td>
-                  <td>{r.reference_number || '—'}</td>
-                  <td>{r.job_number ? `${r.job_number} — ${r.client_name || ''}` : r.client_name || '—'}</td>
-                  <td>{r.employee_name || '—'}</td>
-                  <td>{r.result ? <span className={`badge ${slug(r.result)}`}>{r.result}</span> : '—'}</td>
-                  <td>
+                  <td data-label="Type"><span className={`badge ${slug(r.type)}`}>{r.type}</span></td>
+                  <td data-label="Date">{dstr(r.record_date) || '—'}</td>
+                  <td data-label="Reference #">{r.reference_number || '—'}</td>
+                  <td data-label="Job / Client">{r.job_number ? `${r.job_number} — ${r.client_name || ''}` : r.client_name || '—'}</td>
+                  <td data-label="Electrician">{r.employee_name || '—'}</td>
+                  <td data-label="Result">{r.result ? <span className={`badge ${slug(r.result)}`}>{r.result}</span> : '—'}</td>
+                  <td data-label="Retest Due">
                     {r.retest_due ? (
                       <span className={`badge ${warn ? 'lowstock' : 'instock'}`}>{dstr(r.retest_due)}</span>
                     ) : '—'}
                   </td>
-                  <td>
+                  <td data-label="File">
                     {r.file_url ? (
                       <a href={r.file_url} target="_blank" rel="noreferrer">
                         {/\.(jpe?g|png|webp)$/i.test(r.file_url) ? (
@@ -307,8 +307,8 @@ export default function ComplianceApp({ initialRecords, jobs, clients, employees
                       </a>
                     ) : '—'}
                   </td>
-                  <td>{r.uploaded_by}</td>
-                  <td>
+                  <td data-label="Logged By">{r.uploaded_by}</td>
+                  <td className="cell-actions" data-label="">
                     <div className="row-actions">
                       {canManage && <button className="btn ghost sm" disabled={busy} onClick={() => openEdit(r)}>Edit</button>}
                       {canManage && <button className="btn danger sm" disabled={busy} onClick={() => del(r.id)}>{busy ? 'Deleting…' : 'Delete'}</button>}

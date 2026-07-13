@@ -14,7 +14,7 @@ export default function LogoutButton() {
   }
 
   return (
-    <button onClick={logout} disabled={busy} className="btn ghost sm" style={{ marginLeft: 10 }}>
+    <button onClick={logout} disabled={busy} className="btn ghost sm">
       {busy ? 'Signing out…' : 'Sign out'}
     </button>
   );

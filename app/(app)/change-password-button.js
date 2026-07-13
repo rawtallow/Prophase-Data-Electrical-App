@@ -41,7 +41,7 @@ export default function ChangePasswordButton() {
 
   return (
     <>
-      <button onClick={() => setOpen(true)} className="btn ghost sm" style={{ marginLeft: 10 }}>
+      <button onClick={() => setOpen(true)} className="btn ghost sm">
         Change Password
       </button>
       <Modal open={open} onBackdropClick={() => setOpen(false)}>

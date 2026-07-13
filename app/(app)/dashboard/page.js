@@ -1,14 +1,38 @@
+import Link from 'next/link';
 import { getSession, CAN } from '../../../lib/auth';
 import { sql } from '../../../lib/db';
 import { money, slug, toDisplayDate as fmtDate } from '../../../lib/format';
+import { NavIcon } from '../nav-items';
+
+function firstName(name) {
+  return String(name || '').trim().split(/\s+/)[0] || '';
+}
+
+// Quick-action tiles — shortcuts to the flows used most often, handy one-thumb
+// on a phone. Available to every role.
+function QuickActions() {
+  const actions = [
+    { href: '/quotes/new', label: 'New Quote', icon: 'quote' },
+    { href: '/jobs', label: 'Job Log', icon: 'jobs' },
+    { href: '/receipts', label: 'Log Receipt', icon: 'receipts' },
+    { href: '/clients', label: 'Clients', icon: 'clients' }
+  ];
+  return (
+    <div className="quick-actions">
+      {actions.map((a) => (
+        <Link key={a.href} href={a.href} className="qa">
+          <span className="qa-ic"><NavIcon name={a.icon} /></span>
+          {a.label}
+        </Link>
+      ))}
+    </div>
+  );
+}
 
 export default async function DashboardPage() {
   const session = await getSession();
   const fullAccess = CAN.viewFinancials(session.role);
 
-  // All independent — fire together instead of waiting on each in turn.
-  // The financial queries are skipped entirely for employee-role sessions,
-  // which don't use them.
   const [jobs, parts, quotes, payrollEntries, draws] = await Promise.all([
     sql`select * from jobs order by created_date desc limit 200`,
     sql`select * from parts`,
@@ -22,6 +46,15 @@ export default async function DashboardPage() {
     const activeJobs = jobs.filter((j) => j.status !== 'Complete').slice(0, 10);
     return (
       <>
+        <div className="page-head">
+          <div className="titles">
+            <h1>Dashboard</h1>
+            <div className="sub">Welcome back{firstName(session.name) ? `, ${firstName(session.name)}` : ''}.</div>
+          </div>
+        </div>
+
+        <QuickActions />
+
         <div className="cards">
           <div className="card">
             <div className="label">Active Jobs</div>
@@ -32,7 +65,8 @@ export default async function DashboardPage() {
             <div className="value">{lowStock.length}</div>
           </div>
         </div>
-        <div className="panel">
+
+        <div className="panel card-table">
           <h2 className="section-title">Your Active Jobs</h2>
           <table>
             <thead>
@@ -41,11 +75,11 @@ export default async function DashboardPage() {
             <tbody>
               {activeJobs.map((j) => (
                 <tr key={j.id}>
-                  <td>{j.job_number}</td>
-                  <td><span className={`badge ${slug(j.priority)}`}>{j.priority}</span></td>
-                  <td>{j.client_name}</td>
-                  <td>{fmtDate(j.scheduled_date)}</td>
-                  <td><span className={`badge ${slug(j.status)}`}>{j.status}</span></td>
+                  <td data-label="Job #">{j.job_number}</td>
+                  <td data-label="Priority"><span className={`badge ${slug(j.priority)}`}>{j.priority}</span></td>
+                  <td data-label="Customer">{j.client_name}</td>
+                  <td data-label="Scheduled">{fmtDate(j.scheduled_date)}</td>
+                  <td data-label="Status"><span className={`badge ${slug(j.status)}`}>{j.status}</span></td>
                 </tr>
               ))}
             </tbody>
@@ -76,6 +110,15 @@ export default async function DashboardPage() {
 
   return (
     <>
+      <div className="page-head">
+        <div className="titles">
+          <h1>Dashboard</h1>
+          <div className="sub">Welcome back{firstName(session.name) ? `, ${firstName(session.name)}` : ''}. Here's where the business stands.</div>
+        </div>
+      </div>
+
+      <QuickActions />
+
       <div className="cards">
         <div className="card"><div className="label">Open Quotes</div><div className="value">{openQuotes}</div></div>
         <div className="card"><div className="label">Active Jobs</div><div className="value">{activeJobs.length}</div></div>
@@ -85,18 +128,18 @@ export default async function DashboardPage() {
         <div className={`card${lowStock.length ? ' warn' : ''}`}><div className="label">Low Stock Parts</div><div className="value">{lowStock.length}</div></div>
       </div>
 
-      <div className="panel">
+      <div className="panel card-table">
         <h2 className="section-title">Recent Quotes</h2>
         <table>
           <thead><tr><th>Quote #</th><th>Customer</th><th>Date</th><th>Status</th><th className="num">Total</th></tr></thead>
           <tbody>
             {recentQuotes.map((q) => (
               <tr key={q.id}>
-                <td>{q.quote_number}</td>
-                <td>{q.client_name}</td>
-                <td>{fmtDate(q.date)}</td>
-                <td><span className={`badge ${slug(q.status)}`}>{q.status}</span></td>
-                <td className="num">{money(q.total)}</td>
+                <td data-label="Quote #">{q.quote_number}</td>
+                <td data-label="Customer">{q.client_name}</td>
+                <td data-label="Date">{fmtDate(q.date)}</td>
+                <td data-label="Status"><span className={`badge ${slug(q.status)}`}>{q.status}</span></td>
+                <td className="num" data-label="Total">{money(q.total)}</td>
               </tr>
             ))}
           </tbody>
@@ -104,19 +147,19 @@ export default async function DashboardPage() {
         {recentQuotes.length === 0 && <div className="empty">No quotes yet.</div>}
       </div>
 
-      <div className="panel">
+      <div className="panel card-table">
         <h2 className="section-title">Active Jobs</h2>
         <table>
           <thead><tr><th>Job #</th><th>Priority</th><th>Customer</th><th>Scheduled</th><th>Status</th><th className="num">Balance</th></tr></thead>
           <tbody>
             {activeJobsList.map((j) => (
               <tr key={j.id}>
-                <td>{j.job_number}</td>
-                <td><span className={`badge ${slug(j.priority)}`}>{j.priority}</span></td>
-                <td>{j.client_name}</td>
-                <td>{fmtDate(j.scheduled_date)}</td>
-                <td><span className={`badge ${slug(j.status)}`}>{j.status}</span></td>
-                <td className="num">{money(Number(j.amount_invoiced) - Number(j.amount_paid))}</td>
+                <td data-label="Job #">{j.job_number}</td>
+                <td data-label="Priority"><span className={`badge ${slug(j.priority)}`}>{j.priority}</span></td>
+                <td data-label="Customer">{j.client_name}</td>
+                <td data-label="Scheduled">{fmtDate(j.scheduled_date)}</td>
+                <td data-label="Status"><span className={`badge ${slug(j.status)}`}>{j.status}</span></td>
+                <td className="num" data-label="Balance">{money(Number(j.amount_invoiced) - Number(j.amount_paid))}</td>
               </tr>
             ))}
           </tbody>

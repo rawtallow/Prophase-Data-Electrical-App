@@ -2,51 +2,28 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
+import { visibleItems, isActive, NavIcon } from './nav-items';
 
-// Everyone with any access to these sees them daily, so they stay as
-// direct top-level tabs. The back-office/admin-only pages (below) get
-// folded into a "More" dropdown instead — with those included, the bar
-// was 13-14 items wide and wrapped/scrolled awkwardly, especially for
-// admin/manager who see everything.
-const PRIMARY_ITEMS = [
-  { href: '/dashboard', label: 'Dashboard', show: () => true },
-  { href: '/quotes', label: 'Quotes', show: () => true },
-  { href: '/jobs', label: 'Job Log', show: () => true },
-  { href: '/parts', label: 'Spare Parts', show: () => true },
-  { href: '/clients', label: 'Clients', show: () => true },
-  { href: '/receipts', label: 'Receipts', show: () => true },
-  { href: '/compliance', label: 'Compliance', show: () => true }
-];
-
-const MORE_ITEMS = [
-  { href: '/statistics', label: 'Statistics', show: (fullAccess) => fullAccess },
-  { href: '/payroll', label: 'Payroll', show: (fullAccess) => fullAccess },
-  { href: '/maintenance', label: 'Maintenance', show: (fullAccess) => fullAccess },
-  { href: '/documents', label: 'Documents', show: (fullAccess) => fullAccess },
-  { href: '/users', label: 'Users', show: (_fullAccess, role) => role === 'admin' },
-  { href: '/backup', label: 'Backup', show: (fullAccess) => fullAccess }
-];
-
+// Desktop top navigation: daily-use pages as direct tabs, back-office pages
+// folded into a "More" dropdown. Hidden below 820px (the mobile bottom bar +
+// drawer take over — see mobile-nav.js). Reads the shared nav config so it
+// can't drift from the mobile nav.
 export default function NavLinks({ role }) {
   const pathname = usePathname();
-  const fullAccess = role === 'admin' || role === 'manager';
+  const items = visibleItems(role);
+  const primary = items.filter((i) => i.desktopPrimary);
+  const more = items.filter((i) => !i.desktopPrimary);
+
   const [moreOpen, setMoreOpen] = useState(false);
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
   const triggerRef = useRef(null);
   const menuRef = useRef(null);
+  const moreActive = more.some((i) => isActive(pathname, i.href));
 
-  const primaryItems = PRIMARY_ITEMS.filter((i) => i.show(fullAccess, role));
-  const moreItems = MORE_ITEMS.filter((i) => i.show(fullAccess, role));
-  const moreActive = moreItems.some((i) => pathname.startsWith(i.href));
-
-  // Positioned via getBoundingClientRect + `position: fixed` rather than a
-  // simple `position: absolute` dropdown, since `.tabs` has overflow-x:auto
-  // for mobile scrolling — which also clips absolutely-positioned children
-  // vertically. Fixed positioning escapes that clipping entirely.
   function openMenu() {
     if (triggerRef.current) {
       const r = triggerRef.current.getBoundingClientRect();
-      const left = Math.min(r.left, window.innerWidth - 200);
+      const left = Math.min(r.left, window.innerWidth - 210);
       setMenuPos({ top: r.bottom + 4, left: Math.max(left, 8) });
     }
     setMoreOpen(true);
@@ -59,9 +36,7 @@ export default function NavLinks({ role }) {
       if (menuRef.current?.contains(e.target)) return;
       setMoreOpen(false);
     }
-    function onKey(e) {
-      if (e.key === 'Escape') setMoreOpen(false);
-    }
+    function onKey(e) { if (e.key === 'Escape') setMoreOpen(false); }
     document.addEventListener('mousedown', onClickOutside);
     document.addEventListener('keydown', onKey);
     return () => {
@@ -70,18 +45,16 @@ export default function NavLinks({ role }) {
     };
   }, [moreOpen]);
 
-  useEffect(() => {
-    setMoreOpen(false);
-  }, [pathname]);
+  useEffect(() => { setMoreOpen(false); }, [pathname]);
 
   return (
-    <nav className="tabs">
-      {primaryItems.map((i) => (
-        <Link key={i.href} href={i.href} className={pathname.startsWith(i.href) ? 'active' : ''}>
-          {i.label}
+    <nav className="tabs desktop-only">
+      {primary.map((i) => (
+        <Link key={i.href} href={i.href} className={isActive(pathname, i.href) ? 'active' : ''}>
+          <NavIcon name={i.icon} />{i.label}
         </Link>
       ))}
-      {moreItems.length > 0 && (
+      {more.length > 0 && (
         <>
           <button
             ref={triggerRef}
@@ -90,13 +63,13 @@ export default function NavLinks({ role }) {
             onClick={() => (moreOpen ? setMoreOpen(false) : openMenu())}
             aria-expanded={moreOpen}
           >
-            More {moreOpen ? '▴' : '▾'}
+            <NavIcon name="menu" />More {moreOpen ? '▴' : '▾'}
           </button>
           {moreOpen && (
             <div className="tabs-more-menu" ref={menuRef} style={{ top: menuPos.top, left: menuPos.left }}>
-              {moreItems.map((i) => (
-                <Link key={i.href} href={i.href} className={pathname.startsWith(i.href) ? 'active' : ''}>
-                  {i.label}
+              {more.map((i) => (
+                <Link key={i.href} href={i.href} className={isActive(pathname, i.href) ? 'active' : ''}>
+                  <NavIcon name={i.icon} />{i.label}
                 </Link>
               ))}
             </div>

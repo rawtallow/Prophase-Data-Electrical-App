@@ -173,7 +173,7 @@ export default function MaintenanceApp({ initialContracts, clients, canManage })
         </div>
       </div>
 
-      <div className="panel">
+      <div className="panel card-table">
         <table>
           <thead>
             <tr>
@@ -187,15 +187,15 @@ export default function MaintenanceApp({ initialContracts, clients, canManage })
               const warn = c.status === 'Active' ? dueWarning(c.next_due_date) : null;
               return (
                 <tr key={c.id}>
-                  <td>{c.client_name}</td>
-                  <td>{c.title}</td>
-                  <td>{c.frequency}</td>
-                  <td>
+                  <td data-label="Customer">{c.client_name}</td>
+                  <td data-label="Title">{c.title}</td>
+                  <td data-label="Frequency">{c.frequency}</td>
+                  <td data-label="Next Due">
                     <span className={`badge ${warn ? 'lowstock' : 'instock'}`}>{dstr(c.next_due_date)}</span>
                   </td>
-                  <td className="num">{money(c.amount)}</td>
-                  <td><span className={`badge ${slug(c.status)}`}>{c.status}</span></td>
-                  <td>
+                  <td className="num" data-label="Amount">{money(c.amount)}</td>
+                  <td data-label="Status"><span className={`badge ${slug(c.status)}`}>{c.status}</span></td>
+                  <td className="cell-actions" data-label="">
                     <div className="row-actions">
                       {canManage && c.status === 'Active' && (
                         <button className="btn amber sm" disabled={busy} onClick={() => generateJob(c)}>Generate Job</button>
