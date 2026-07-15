@@ -27,8 +27,12 @@ export async function POST(req) {
     // Delete children first to satisfy foreign keys. compliance_records
     // references jobs/clients/employees, so it must go before all three;
     // maintenance_contracts references clients, so before clients too.
+    // purchase_order_line_items/purchase_orders reference jobs and suppliers,
+    // so both must go before jobs and before suppliers.
     sql`delete from compliance_records`,
     sql`delete from maintenance_contracts`,
+    sql`delete from purchase_order_line_items`,
+    sql`delete from purchase_orders`,
     sql`delete from payroll_allocations`,
     sql`delete from payroll_entries`,
     sql`delete from quote_line_items`,
@@ -38,6 +42,7 @@ export async function POST(req) {
     sql`delete from employees`,
     sql`delete from owner_draws`,
     sql`delete from parts`,
+    sql`delete from suppliers`,
     sql`delete from clients`,
     sql`delete from receipts`
   ];
@@ -132,6 +137,34 @@ export async function POST(req) {
         insert into maintenance_contracts (id, client_id, client_name, title, description, frequency, start_date, next_due_date, amount, status, notes, created_by, created_at)
         values (${mc.id}, ${mc.client_id}, ${mc.client_name}, ${mc.title}, ${mc.description || ''}, ${mc.frequency || 'Quarterly'},
           ${mc.start_date}, ${mc.next_due_date}, ${mc.amount || 0}, ${mc.status || 'Active'}, ${mc.notes || ''}, ${mc.created_by || ''}, ${mc.created_at})
+      `);
+    }
+  }
+  if (Array.isArray(data.suppliers)) {
+    for (const s of data.suppliers) {
+      queries.push(sql`
+        insert into suppliers (id, name, account_number, contact_name, phone, email, address, payment_terms, portal_url, notes, created_at)
+        values (${s.id}, ${s.name}, ${s.account_number || ''}, ${s.contact_name || ''}, ${s.phone || ''}, ${s.email || ''}, ${s.address || ''}, ${s.payment_terms || ''}, ${s.portal_url || ''}, ${s.notes || ''}, ${s.created_at})
+      `);
+    }
+  }
+  // Needs suppliers and jobs already inserted (both loops run earlier above).
+  if (Array.isArray(data.purchaseOrders)) {
+    for (const po of data.purchaseOrders) {
+      queries.push(sql`
+        insert into purchase_orders (id, po_number, date, supplier_id, supplier_name, job_id, job_number, status,
+          subtotal, tax_rate, tax, total, notes, created_at, approval_status, created_by_id, created_by, approval_note, reviewed_by)
+        values (${po.id}, ${po.po_number}, ${po.date}, ${po.supplier_id || null}, ${po.supplier_name}, ${po.job_id || null}, ${po.job_number || ''}, ${po.status},
+          ${po.subtotal}, ${po.tax_rate}, ${po.tax}, ${po.total}, ${po.notes}, ${po.created_at},
+          ${po.approval_status || 'Approved'}, ${po.created_by_id || null}, ${po.created_by || ''}, ${po.approval_note || ''}, ${po.reviewed_by || ''})
+      `);
+    }
+  }
+  if (Array.isArray(data.purchaseOrderLineItems)) {
+    for (const li of data.purchaseOrderLineItems) {
+      queries.push(sql`
+        insert into purchase_order_line_items (id, purchase_order_id, part_id, description, qty, unit_cost, qty_received, sort_order)
+        values (${li.id}, ${li.purchase_order_id}, ${li.part_id || null}, ${li.description}, ${li.qty}, ${li.unit_cost}, ${li.qty_received}, ${li.sort_order})
       `);
     }
   }

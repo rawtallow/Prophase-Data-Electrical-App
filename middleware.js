@@ -14,6 +14,7 @@ const FULL_ACCESS_PREFIXES = [
   '/statistics',
   '/maintenance',
   '/documents',
+  '/suppliers',
   '/api/payroll',
   '/api/draws',
   '/api/employees',
@@ -47,6 +48,11 @@ function isQuoteAgreement(pathname) {
 function isJobWarranty(pathname) {
   return /^\/api\/jobs\/[^/]+\/warranty$/.test(pathname);
 }
+// Same reasoning as isQuotePrint: employees can draft/view POs but sending
+// one to a supplier stays a manager action.
+function isPOPrint(pathname) {
+  return /^\/purchase-orders\/[^/]+\/print(\/.*)?$/.test(pathname);
+}
 
 export async function middleware(req) {
   const { pathname } = req.nextUrl;
@@ -73,6 +79,10 @@ export async function middleware(req) {
 
   if (isQuotePrint(pathname) && session.role === 'employee') {
     return NextResponse.redirect(new URL('/quotes?denied=1', req.url));
+  }
+
+  if (isPOPrint(pathname) && session.role === 'employee') {
+    return NextResponse.redirect(new URL('/purchase-orders?denied=1', req.url));
   }
 
   if ((isQuoteAgreement(pathname) || isJobWarranty(pathname)) && session.role === 'employee') {

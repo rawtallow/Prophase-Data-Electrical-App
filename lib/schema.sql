@@ -18,7 +18,7 @@ create table if not exists counters (
   key text primary key,
   value int not null default 0
 );
-insert into counters (key, value) values ('quote', 0), ('job', 0), ('pay', 0)
+insert into counters (key, value) values ('quote', 0), ('job', 0), ('pay', 0), ('po', 0)
   on conflict (key) do nothing;
 
 create table if not exists clients (
@@ -239,4 +239,62 @@ create table if not exists maintenance_contracts (
   notes text default '',
   created_by text default '',
   created_at timestamptz not null default now()
+);
+
+-- Wholesaler trade accounts (Middys, Rexel, L&H, etc.) — the "account
+-- number" is Prophase's own customer/account number with that supplier,
+-- not a login credential.
+create table if not exists suppliers (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  account_number text default '',
+  contact_name text default '',
+  phone text default '',
+  email text default '',
+  address text default '',
+  payment_terms text default '',
+  portal_url text default '',
+  notes text default '',
+  created_at timestamptz not null default now()
+);
+
+-- Purchase orders for materials. Mirrors the quotes approval workflow
+-- (see quotes.approval_status / app/api/quotes/[id]/review) — an
+-- employee-drafted PO needs manager/admin sign-off before it can be sent
+-- to the supplier, while a manager/admin's own PO is auto-approved.
+create table if not exists purchase_orders (
+  id uuid primary key default gen_random_uuid(),
+  po_number text not null,
+  date date not null default current_date,
+  supplier_id uuid references suppliers(id),
+  supplier_name text not null,
+  job_id uuid references jobs(id),
+  job_number text default '',
+  status text not null default 'Draft', -- Draft, Sent, Partially Received, Received, Cancelled
+  subtotal numeric not null default 0,
+  tax_rate numeric not null default 10,
+  tax numeric not null default 0,
+  total numeric not null default 0,
+  notes text default '',
+  created_at timestamptz not null default now(),
+  approval_status text not null default 'Approved',
+  created_by_id uuid,
+  created_by text default '',
+  approval_note text default '',
+  reviewed_by text default ''
+);
+
+-- part_id is nullable: a line can point at an existing Spare Parts record
+-- (receiving it bumps parts.qty_on_hand) or be a one-off item not tracked
+-- in inventory. qty_received supports partial deliveries — see
+-- app/api/purchase-orders/[id]/receive.
+create table if not exists purchase_order_line_items (
+  id uuid primary key default gen_random_uuid(),
+  purchase_order_id uuid not null references purchase_orders(id) on delete cascade,
+  part_id uuid references parts(id),
+  description text not null,
+  qty numeric not null default 1,
+  unit_cost numeric not null default 0,
+  qty_received numeric not null default 0,
+  sort_order int not null default 0
 );

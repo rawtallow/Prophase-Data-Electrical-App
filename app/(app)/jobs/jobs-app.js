@@ -8,7 +8,7 @@ const STATUSES = ['Quoted', 'Scheduled', 'In Progress', 'Complete'];
 const PRIORITIES = ['High', 'Medium', 'Low'];
 const JOB_TYPES = ['Call Out', 'Scheduled / Preventative Maintenance', 'Quoted Job'];
 
-export default function JobsApp({ initialJobs, clients, assets, laborByJob, fullAccess, canManageJobs }) {
+export default function JobsApp({ initialJobs, clients, assets, laborByJob, materialsByJob, fullAccess, canManageJobs }) {
   const [jobs, setJobs] = useState(initialJobs);
   const [statusFilter, setStatusFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
@@ -135,7 +135,7 @@ export default function JobsApp({ initialJobs, clients, assets, laborByJob, full
           <thead>
             <tr>
               <th>Job #</th><th>Priority</th><th>Type</th><th>Customer</th><th>Description</th><th>Scheduled</th><th>Status</th>
-              {fullAccess && <><th className="num">Invoiced</th><th className="num">Paid</th><th className="num">Balance</th><th className="num">Labor Cost</th><th className="num">Margin</th></>}
+              {fullAccess && <><th className="num">Invoiced</th><th className="num">Paid</th><th className="num">Balance</th><th className="num">Labor Cost</th><th className="num">Materials</th><th className="num">Margin</th></>}
               <th>Actions</th>
             </tr>
           </thead>
@@ -143,7 +143,8 @@ export default function JobsApp({ initialJobs, clients, assets, laborByJob, full
             {list.map((j) => {
               const balance = Number(j.amount_invoiced) - Number(j.amount_paid);
               const labor = laborByJob[j.id] || 0;
-              const margin = Number(j.amount_invoiced) - labor;
+              const materials = materialsByJob[j.id] || 0;
+              const margin = Number(j.amount_invoiced) - labor - materials;
               const busy = busyId === j.id;
               return (
                 <tr key={j.id}>
@@ -160,6 +161,7 @@ export default function JobsApp({ initialJobs, clients, assets, laborByJob, full
                       <td className="num" data-label="Paid">{money(j.amount_paid)}</td>
                       <td className="num" data-label="Balance" style={{ fontWeight: 700, color: balance > 0 ? 'var(--red)' : 'var(--green)' }}>{money(balance)}</td>
                       <td className="num" data-label="Labor Cost">{money(labor)}</td>
+                      <td className="num" data-label="Materials">{money(materials)}</td>
                       <td className="num" data-label="Margin" style={{ color: margin >= 0 ? 'var(--green)' : 'var(--red)' }}>{money(margin)}</td>
                     </>
                   )}
