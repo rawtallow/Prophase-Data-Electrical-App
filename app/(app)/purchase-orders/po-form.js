@@ -28,9 +28,41 @@ export default function PoForm({ existing, suppliers, parts, jobs, fullAccess })
   );
   const [saving, setSaving] = useState(false);
 
-  function onSupplierNameChange(name) {
-    const match = suppliers.find((s) => s.name.toLowerCase() === name.toLowerCase());
-    setForm({ ...form, supplierName: name, supplierId: match ? match.id : '' });
+  // Local copy of the supplier list so a newly-added supplier shows up in
+  // the dropdown immediately without a full page reload.
+  const [supplierList, setSupplierList] = useState(suppliers);
+  const [addingSupplier, setAddingSupplier] = useState(false);
+  const [newSupplier, setNewSupplier] = useState({ name: '', accountNumber: '', phone: '' });
+  const [savingSupplier, setSavingSupplier] = useState(false);
+
+  function onSupplierSelect(value) {
+    if (value === '__new__') {
+      setAddingSupplier(true);
+      return;
+    }
+    const match = supplierList.find((s) => s.id === value);
+    setForm({ ...form, supplierId: value, supplierName: match ? match.name : '' });
+  }
+  async function saveNewSupplier() {
+    if (!newSupplier.name.trim()) return toast.error('Supplier name is required');
+    setSavingSupplier(true);
+    const res = await fetch('/api/suppliers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newSupplier)
+    });
+    setSavingSupplier(false);
+    if (res.ok) {
+      const created = await res.json();
+      setSupplierList([...supplierList, created].sort((a, b) => a.name.localeCompare(b.name)));
+      setForm({ ...form, supplierId: created.id, supplierName: created.name });
+      setAddingSupplier(false);
+      setNewSupplier({ name: '', accountNumber: '', phone: '' });
+      toast.success('Supplier added');
+    } else {
+      const d = await res.json();
+      toast.error(d.error || 'Could not add supplier');
+    }
   }
   function onJobChange(jobId) {
     const job = jobs.find((j) => j.id === jobId);
@@ -106,8 +138,28 @@ export default function PoForm({ existing, suppliers, parts, jobs, fullAccess })
         <div className="grid-2">
           <div className="field">
             <label>Supplier *</label>
-            <input list="supplier-names" value={form.supplierName} onChange={(e) => onSupplierNameChange(e.target.value)} />
-            <datalist id="supplier-names">{suppliers.map((s) => <option key={s.id} value={s.name} />)}</datalist>
+            {!addingSupplier ? (
+              <select value={form.supplierId} onChange={(e) => onSupplierSelect(e.target.value)}>
+                <option value="">— Select a supplier —</option>
+                {supplierList.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                {form.supplierId && !supplierList.some((s) => s.id === form.supplierId) && (
+                  <option value={form.supplierId}>{form.supplierName} (not in supplier list)</option>
+                )}
+                {fullAccess && <option value="__new__">+ Add New Supplier…</option>}
+              </select>
+            ) : (
+              <div style={{ background: 'var(--bg-soft)', border: '1px dashed var(--border-strong)', borderRadius: 'var(--r-sm)', padding: 12 }}>
+                <div className="field"><label>New Supplier Name *</label><input value={newSupplier.name} onChange={(e) => setNewSupplier({ ...newSupplier, name: e.target.value })} /></div>
+                <div className="grid-2">
+                  <div className="field"><label>Account Number</label><input value={newSupplier.accountNumber} onChange={(e) => setNewSupplier({ ...newSupplier, accountNumber: e.target.value })} /></div>
+                  <div className="field"><label>Phone</label><input value={newSupplier.phone} onChange={(e) => setNewSupplier({ ...newSupplier, phone: e.target.value })} /></div>
+                </div>
+                <div className="footer-actions" style={{ marginTop: 0 }}>
+                  <button type="button" className="btn ghost sm" onClick={() => { setAddingSupplier(false); setNewSupplier({ name: '', accountNumber: '', phone: '' }); }}>Cancel</button>
+                  <button type="button" className="btn amber sm" disabled={savingSupplier} onClick={saveNewSupplier}>{savingSupplier ? 'Saving…' : 'Save Supplier'}</button>
+                </div>
+              </div>
+            )}
           </div>
           <div className="field">
             <label>Job (optional)</label>
