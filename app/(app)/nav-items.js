@@ -10,22 +10,25 @@
 
 const fullAccess = (role) => role === 'admin' || role === 'manager';
 
+// Workspace items follow the natural job of work: bring on a client, quote
+// it, run the job, then the job-support tasks (order materials, track
+// stock/compliance, log expenses). Management items lead with reporting,
+// then day-to-day back-office tasks, ending with the two system-level
+// pages (Users/Backup) that are touched least often and carry the most risk.
 export const NAV_ITEMS = [
   { href: '/dashboard', label: 'Dashboard', icon: 'home', desktopPrimary: true, bottom: true, section: 'Workspace', show: () => true },
+  { href: '/clients', label: 'Clients', icon: 'clients', desktopPrimary: true, bottom: true, section: 'Workspace', show: () => true },
   { href: '/quotes', label: 'Quotes', icon: 'quote', desktopPrimary: true, bottom: true, section: 'Workspace', show: () => true },
   { href: '/jobs', label: 'Job Log', short: 'Jobs', icon: 'jobs', desktopPrimary: true, bottom: true, section: 'Workspace', show: () => true },
-  { href: '/clients', label: 'Clients', icon: 'clients', desktopPrimary: true, bottom: true, section: 'Workspace', show: () => true },
-  { href: '/parts', label: 'Spare Parts', icon: 'parts', desktopPrimary: true, section: 'Workspace', show: () => true },
-  { href: '/receipts', label: 'Receipts', icon: 'receipts', desktopPrimary: true, section: 'Workspace', show: () => true },
-  { href: '/compliance', label: 'Compliance', icon: 'compliance', desktopPrimary: true, section: 'Workspace', show: () => true },
-  // Visible to every role (employees draft POs, same as Quotes) but not a
-  // bottom-bar slot — those four stay Dashboard/Quotes/Jobs/Clients.
   { href: '/purchase-orders', label: 'Purchase Orders', short: 'POs', icon: 'po', desktopPrimary: true, section: 'Workspace', show: () => true },
+  { href: '/parts', label: 'Spare Parts', icon: 'parts', desktopPrimary: true, section: 'Workspace', show: () => true },
+  { href: '/compliance', label: 'Compliance', icon: 'compliance', desktopPrimary: true, section: 'Workspace', show: () => true },
+  { href: '/receipts', label: 'Receipts', icon: 'receipts', desktopPrimary: true, section: 'Workspace', show: () => true },
   { href: '/statistics', label: 'Statistics', icon: 'stats', section: 'Management', show: fullAccess },
   { href: '/payroll', label: 'Payroll', icon: 'payroll', section: 'Management', show: fullAccess },
+  { href: '/suppliers', label: 'Suppliers', icon: 'suppliers', section: 'Management', show: fullAccess },
   { href: '/maintenance', label: 'Maintenance', icon: 'maintenance', section: 'Management', show: fullAccess },
   { href: '/documents', label: 'Documents', icon: 'documents', section: 'Management', show: fullAccess },
-  { href: '/suppliers', label: 'Suppliers', icon: 'suppliers', section: 'Management', show: fullAccess },
   { href: '/users', label: 'Users', icon: 'users', section: 'Management', show: (role) => role === 'admin' },
   { href: '/backup', label: 'Backup', icon: 'backup', section: 'Management', show: fullAccess }
 ];

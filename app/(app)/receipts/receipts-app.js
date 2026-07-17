@@ -146,9 +146,14 @@ export default function ReceiptsApp({ initialReceipts, canManage }) {
     if (!ok) return;
     setBusyId(id);
     try {
-      await fetch(`/api/receipts/${id}`, { method: 'DELETE' });
-      toast.success('Receipt deleted');
-      await refresh();
+      const res = await fetch(`/api/receipts/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        toast.success('Receipt deleted');
+        await refresh();
+      } else {
+        const d = await res.json().catch(() => ({}));
+        toast.error(d.error || 'Could not delete receipt');
+      }
     } finally {
       setBusyId(null);
     }

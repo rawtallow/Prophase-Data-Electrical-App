@@ -30,7 +30,7 @@ export async function POST(req) {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const body = await req.json();
-  const { supplierId, supplierName, jobId, jobNumber, lineItems, taxRate, notes } = body;
+  const { supplierId, supplierName, jobId, jobNumber, lineItems, taxRate, status, notes } = body;
 
   if (!supplierName || !supplierName.trim()) return NextResponse.json({ error: 'Supplier is required' }, { status: 400 });
   const cleanItems = (lineItems || []).filter((li) => (li.description || '').trim() !== '' || (Number(li.qty) || 0) * (Number(li.unitCost) || 0) !== 0);
@@ -43,11 +43,12 @@ export async function POST(req) {
   // can be sent to the supplier — same rule as quotes (see
   // app/api/quotes/route.js). A manager/admin's own PO is auto-approved.
   const isEmployee = session.role === 'employee';
+  const finalStatus = isEmployee ? 'Draft' : (status || 'Draft');
   const approvalStatus = isEmployee ? 'Pending Approval' : 'Approved';
 
   const rows = await sql`
-    insert into purchase_orders (po_number, supplier_id, supplier_name, job_id, job_number, tax_rate, subtotal, tax, total, notes, approval_status, created_by_id, created_by)
-    values (${poNumber}, ${supplierId || null}, ${supplierName.trim()}, ${jobId || null}, ${jobNumber || ''},
+    insert into purchase_orders (po_number, supplier_id, supplier_name, job_id, job_number, status, tax_rate, subtotal, tax, total, notes, approval_status, created_by_id, created_by)
+    values (${poNumber}, ${supplierId || null}, ${supplierName.trim()}, ${jobId || null}, ${jobNumber || ''}, ${finalStatus},
       ${Number(taxRate) || 0}, ${subtotal}, ${tax}, ${total}, ${notes || ''}, ${approvalStatus}, ${session.id}, ${session.name})
     returning *
   `;

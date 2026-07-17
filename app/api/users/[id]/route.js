@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
-import { sql } from '../../../../lib/db';
+import { sql, isForeignKeyViolation } from '../../../../lib/db';
 import { getSession, CAN, ROLES } from '../../../../lib/auth';
 
 export const runtime = 'nodejs';
@@ -36,6 +36,14 @@ export async function DELETE(req, { params }) {
   if (params.id === session.id) {
     return NextResponse.json({ error: "You can't delete your own account." }, { status: 400 });
   }
-  await sql`delete from users where id = ${params.id}`;
-  return NextResponse.json({ ok: true });
+  try {
+    await sql`delete from users where id = ${params.id}`;
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    if (isForeignKeyViolation(err)) {
+      return NextResponse.json({ error: 'This account is linked to other records and can\'t be deleted.' }, { status: 409 });
+    }
+    console.error('Delete user error:', err);
+    return NextResponse.json({ error: 'Could not delete user' }, { status: 500 });
+  }
 }

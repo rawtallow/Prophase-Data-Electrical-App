@@ -63,9 +63,14 @@ export default function ClientsApp({ initialClients, initialAssets, jobsByAsset,
     if (!ok) return;
     setBusyId(id);
     try {
-      await fetch(`/api/clients/${id}`, { method: 'DELETE' });
-      toast.success('Client deleted');
-      await refresh();
+      const res = await fetch(`/api/clients/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        toast.success('Client deleted');
+        await refresh();
+      } else {
+        const d = await res.json().catch(() => ({}));
+        toast.error(d.error || 'Could not delete client');
+      }
     } finally {
       setBusyId(null);
     }
@@ -105,9 +110,14 @@ export default function ClientsApp({ initialClients, initialAssets, jobsByAsset,
     if (!ok) return;
     setBusyId(id);
     try {
-      await fetch(`/api/assets/${id}`, { method: 'DELETE' });
-      toast.success('Asset deleted');
-      await refresh();
+      const res = await fetch(`/api/assets/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        toast.success('Asset deleted');
+        await refresh();
+      } else {
+        const d = await res.json().catch(() => ({}));
+        toast.error(d.error || 'Could not delete asset');
+      }
     } finally {
       setBusyId(null);
     }

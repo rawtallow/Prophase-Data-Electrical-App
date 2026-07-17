@@ -19,7 +19,7 @@ export default async function StatisticsPage({ searchParams }) {
   // exclusive upper bound instead.
   const nextFYStart = fyBounds(fy + 1).start;
 
-  const [earliestRows, quotes, jobs, payrollEntries, draws, laborRows, newClients] = await Promise.all([
+  const [earliestRows, quotes, jobs, payrollEntries, draws, laborRows, materialRows, newClients] = await Promise.all([
     sql`
       select min(d) as d from (
         select date as d from quotes
@@ -39,16 +39,24 @@ export default async function StatisticsPage({ searchParams }) {
       where pa.job_id is not null
       group by pa.job_id
     `,
+    sql`
+      select job_id, sum(total) as cost
+      from purchase_orders
+      where job_id is not null and status != 'Cancelled'
+      group by job_id
+    `,
     sql`select lead_source from clients where created_at >= ${start} and created_at < ${nextFYStart}`
   ]);
   const years = fyRangeFromEarliest(earliestRows[0]?.d);
   const laborByJob = Object.fromEntries(laborRows.map((r) => [r.job_id, Number(r.cost) || 0]));
+  const materialsByJob = Object.fromEntries(materialRows.map((r) => [r.job_id, Number(r.cost) || 0]));
 
   const totalInvoiced = jobs.reduce((s, j) => s + Number(j.amount_invoiced), 0);
   const totalCollected = jobs.reduce((s, j) => s + Number(j.amount_paid), 0);
   const outstanding = jobs.reduce((s, j) => s + Math.max(Number(j.amount_invoiced) - Number(j.amount_paid), 0), 0);
   const totalLabor = jobs.reduce((s, j) => s + (laborByJob[j.id] || 0), 0);
-  const margin = totalInvoiced - totalLabor;
+  const totalMaterials = jobs.reduce((s, j) => s + (materialsByJob[j.id] || 0), 0);
+  const margin = totalInvoiced - totalLabor - totalMaterials;
   const completedJobs = jobs.filter((j) => j.status === 'Complete').length;
 
   const accepted = quotes.filter((q) => q.status === 'Accepted').length;
@@ -97,6 +105,7 @@ export default async function StatisticsPage({ searchParams }) {
         <div className="card"><div className="label">Quotes Created</div><div className="value">{quotes.length}</div></div>
         <div className="card"><div className="label">Quote Acceptance Rate</div><div className="value">{acceptanceRate === null ? '—' : `${acceptanceRate.toFixed(0)}%`}</div></div>
         <div className="card"><div className="label">Labor Cost (Payroll)</div><div className="value">{money(totalGrossPay)}</div></div>
+        <div className="card"><div className="label">Materials Cost (POs)</div><div className="value">{money(totalMaterials)}</div></div>
         <div className="card"><div className="label">Owner Draws</div><div className="value">{money(totalDraws)}</div></div>
         <div className="card"><div className="label">New Clients</div><div className="value">{newClients.length}</div></div>
       </div>

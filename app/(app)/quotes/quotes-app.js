@@ -187,7 +187,9 @@ export default function QuotesApp({ initialQuotes, myId, fullAccess }) {
                       {canPrint && <a className="btn ghost sm" href={`/quotes/${q.id}/print`} target="_blank" rel="noreferrer">Print</a>}
                       {canPrint && <a className="btn ghost sm" href={`/api/quotes/${q.id}/agreement`}>Agreement</a>}
                       {fullAccess && <button className="btn ghost sm" disabled={busy} onClick={() => duplicate(q.id)}>Duplicate</button>}
-                      {fullAccess && <button className="btn amber sm" disabled={busy} onClick={() => convert(q.id)}>To Job</button>}
+                      {canPrint && (q.status === 'Draft' || q.status === 'Sent') && (
+                        <button className="btn amber sm" disabled={busy} onClick={() => convert(q.id)}>To Job</button>
+                      )}
                       {canEditOrDelete(q) && (
                         <button className="btn danger sm" disabled={busy} onClick={() => del(q.id)}>{busy ? '…' : 'Delete'}</button>
                       )}

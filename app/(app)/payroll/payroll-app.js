@@ -86,9 +86,14 @@ export default function PayrollApp({ initialEmployees, initialEntries, initialDr
     if (!ok) return;
     setBusyId(id);
     try {
-      await fetch(`/api/employees/${id}`, { method: 'DELETE' });
-      toast.success('Employee deleted');
-      await refreshAll();
+      const res = await fetch(`/api/employees/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        toast.success('Employee deleted');
+        await refreshAll();
+      } else {
+        const d = await res.json().catch(() => ({}));
+        toast.error(d.error || 'Could not delete employee');
+      }
     } finally {
       setBusyId(null);
     }
@@ -160,9 +165,14 @@ export default function PayrollApp({ initialEmployees, initialEntries, initialDr
     if (!ok) return;
     setBusyId(id);
     try {
-      await fetch(`/api/payroll/${id}`, { method: 'DELETE' });
-      toast.success('Pay run deleted');
-      await refreshAll();
+      const res = await fetch(`/api/payroll/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        toast.success('Pay run deleted');
+        await refreshAll();
+      } else {
+        const d = await res.json().catch(() => ({}));
+        toast.error(d.error || 'Could not delete pay run');
+      }
     } finally {
       setBusyId(null);
     }
@@ -194,9 +204,14 @@ export default function PayrollApp({ initialEmployees, initialEntries, initialDr
     if (!ok) return;
     setBusyId(id);
     try {
-      await fetch(`/api/draws/${id}`, { method: 'DELETE' });
-      toast.success('Draw deleted');
-      await refreshAll();
+      const res = await fetch(`/api/draws/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        toast.success('Draw deleted');
+        await refreshAll();
+      } else {
+        const d = await res.json().catch(() => ({}));
+        toast.error(d.error || 'Could not delete draw');
+      }
     } finally {
       setBusyId(null);
     }

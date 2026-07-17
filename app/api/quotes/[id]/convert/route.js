@@ -11,6 +11,15 @@ export async function POST(req, { params }) {
   const quotes = await sql`select * from quotes where id = ${params.id}`;
   const q = quotes[0];
   if (!q) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  if (q.approval_status !== 'Approved') {
+    return NextResponse.json({ error: 'Approve this quote before converting it to a job' }, { status: 400 });
+  }
+  if (q.status === 'Accepted') {
+    return NextResponse.json({ error: 'This quote has already been converted to a job' }, { status: 400 });
+  }
+  if (q.status === 'Declined') {
+    return NextResponse.json({ error: 'This quote was declined and can\'t be converted to a job' }, { status: 400 });
+  }
 
   const numRows = await sql`update counters set value = value + 1 where key = 'job' returning value`;
   const jobNumber = 'J-' + String(numRows[0].value).padStart(4, '0');

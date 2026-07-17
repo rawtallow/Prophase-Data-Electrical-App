@@ -154,9 +154,14 @@ export default function ComplianceApp({ initialRecords, jobs, clients, employees
     if (!ok) return;
     setBusyId(id);
     try {
-      await fetch(`/api/compliance/${id}`, { method: 'DELETE' });
-      toast.success('Record deleted');
-      await refresh();
+      const res = await fetch(`/api/compliance/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        toast.success('Record deleted');
+        await refresh();
+      } else {
+        const d = await res.json().catch(() => ({}));
+        toast.error(d.error || 'Could not delete record');
+      }
     } finally {
       setBusyId(null);
     }

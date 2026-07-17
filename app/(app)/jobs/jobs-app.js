@@ -90,9 +90,14 @@ export default function JobsApp({ initialJobs, clients, assets, laborByJob, mate
     if (!ok) return;
     setBusyId(id);
     try {
-      await fetch(`/api/jobs/${id}`, { method: 'DELETE' });
-      toast.success('Job deleted');
-      await refresh();
+      const res = await fetch(`/api/jobs/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        toast.success('Job deleted');
+        await refresh();
+      } else {
+        const d = await res.json().catch(() => ({}));
+        toast.error(d.error || 'Could not delete job');
+      }
     } finally {
       setBusyId(null);
     }

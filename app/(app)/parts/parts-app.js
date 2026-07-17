@@ -55,9 +55,14 @@ export default function PartsApp({ initialParts, canManage }) {
     if (!ok) return;
     setBusyId(id);
     try {
-      await fetch(`/api/parts/${id}`, { method: 'DELETE' });
-      toast.success('Part deleted');
-      await refresh();
+      const res = await fetch(`/api/parts/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        toast.success('Part deleted');
+        await refresh();
+      } else {
+        const d = await res.json().catch(() => ({}));
+        toast.error(d.error || 'Could not delete part');
+      }
     } finally {
       setBusyId(null);
     }

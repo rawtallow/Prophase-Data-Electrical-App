@@ -88,9 +88,14 @@ export default function MaintenanceApp({ initialContracts, clients, canManage })
     if (!ok) return;
     setBusyId(id);
     try {
-      await fetch(`/api/maintenance-contracts/${id}`, { method: 'DELETE' });
-      toast.success('Contract deleted');
-      await refresh();
+      const res = await fetch(`/api/maintenance-contracts/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        toast.success('Contract deleted');
+        await refresh();
+      } else {
+        const d = await res.json().catch(() => ({}));
+        toast.error(d.error || 'Could not delete contract');
+      }
     } finally {
       setBusyId(null);
     }

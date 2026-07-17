@@ -13,7 +13,7 @@ export default async function RevenueStatisticsPage({ searchParams }) {
   const fy = searchParams.fy ? Number(searchParams.fy) : currentFYStartYear();
   const { start, end } = fyBounds(fy);
 
-  const [earliestRows, jobs, laborRows] = await Promise.all([
+  const [earliestRows, jobs, laborRows, materialRows] = await Promise.all([
     sql`
       select min(d) as d from (
         select date as d from quotes
@@ -29,17 +29,25 @@ export default async function RevenueStatisticsPage({ searchParams }) {
       join payroll_entries pe on pe.id = pa.payroll_entry_id
       where pa.job_id is not null
       group by pa.job_id
+    `,
+    sql`
+      select job_id, sum(total) as cost
+      from purchase_orders
+      where job_id is not null and status != 'Cancelled'
+      group by job_id
     `
   ]);
   const years = fyRangeFromEarliest(earliestRows[0]?.d);
   const laborByJob = Object.fromEntries(laborRows.map((r) => [r.job_id, Number(r.cost) || 0]));
+  const materialsByJob = Object.fromEntries(materialRows.map((r) => [r.job_id, Number(r.cost) || 0]));
 
   const totalInvoiced = jobs.reduce((s, j) => s + Number(j.amount_invoiced), 0);
   const totalCollected = jobs.reduce((s, j) => s + Number(j.amount_paid), 0);
   const outstanding = jobs.reduce((s, j) => s + Math.max(Number(j.amount_invoiced) - Number(j.amount_paid), 0), 0);
   const collectionRate = totalInvoiced > 0 ? (totalCollected / totalInvoiced) * 100 : null;
   const totalLabor = jobs.reduce((s, j) => s + (laborByJob[j.id] || 0), 0);
-  const margin = totalInvoiced - totalLabor;
+  const totalMaterials = jobs.reduce((s, j) => s + (materialsByJob[j.id] || 0), 0);
+  const margin = totalInvoiced - totalLabor - totalMaterials;
 
   const months = fyMonths(fy);
   const monthly = months.map((m) => {
@@ -48,7 +56,8 @@ export default async function RevenueStatisticsPage({ searchParams }) {
     const invoiced = monthJobs.reduce((s, j) => s + Number(j.amount_invoiced), 0);
     const collected = monthJobs.reduce((s, j) => s + Number(j.amount_paid), 0);
     const labor = monthJobs.reduce((s, j) => s + (laborByJob[j.id] || 0), 0);
-    return { label: m.label, invoiced, collected, outstanding: invoiced - collected, margin: invoiced - labor };
+    const materials = monthJobs.reduce((s, j) => s + (materialsByJob[j.id] || 0), 0);
+    return { label: m.label, invoiced, collected, outstanding: invoiced - collected, margin: invoiced - labor - materials };
   });
 
   return (
@@ -62,7 +71,7 @@ export default async function RevenueStatisticsPage({ searchParams }) {
         <div className="card good"><div className="label">Total Collected</div><div className="value">{money(totalCollected)}</div></div>
         <div className={`card${outstanding > 0 ? ' warn' : ''}`}><div className="label">Outstanding</div><div className="value">{money(outstanding)}</div></div>
         <div className="card"><div className="label">Collection Rate</div><div className="value">{collectionRate === null ? '—' : `${collectionRate.toFixed(0)}%`}</div></div>
-        <div className="card"><div className="label">Net Margin (after labor)</div><div className="value">{money(margin)}</div></div>
+        <div className="card"><div className="label">Net Margin (after labor &amp; materials)</div><div className="value">{money(margin)}</div></div>
       </div>
 
       <div className="panel">

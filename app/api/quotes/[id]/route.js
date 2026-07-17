@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { sql } from '../../../../lib/db';
+import { sql, isForeignKeyViolation } from '../../../../lib/db';
 import { getSession, CAN } from '../../../../lib/auth';
 
 export const runtime = 'nodejs';
@@ -89,18 +89,24 @@ export async function DELETE(req, { params }) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  if (CAN.editQuotes(session.role)) {
-    await sql`delete from quotes where id = ${params.id}`;
-    return NextResponse.json({ ok: true });
+  if (!CAN.editQuotes(session.role)) {
+    // Employees can only remove their own quote while it's still awaiting
+    // (or was sent back for) review — not once it's been approved.
+    const rows = await sql`select created_by_id, approval_status from quotes where id = ${params.id}`;
+    const existing = rows[0];
+    if (!existing || existing.created_by_id !== session.id || existing.approval_status === 'Approved') {
+      return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
+    }
   }
 
-  // Employees can only remove their own quote while it's still awaiting
-  // (or was sent back for) review — not once it's been approved.
-  const rows = await sql`select created_by_id, approval_status from quotes where id = ${params.id}`;
-  const existing = rows[0];
-  if (!existing || existing.created_by_id !== session.id || existing.approval_status === 'Approved') {
-    return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
+  try {
+    await sql`delete from quotes where id = ${params.id}`;
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    if (isForeignKeyViolation(err)) {
+      return NextResponse.json({ error: 'This quote has already been converted to a job and can\'t be deleted.' }, { status: 409 });
+    }
+    console.error('Delete quote error:', err);
+    return NextResponse.json({ error: 'Could not delete quote' }, { status: 500 });
   }
-  await sql`delete from quotes where id = ${params.id}`;
-  return NextResponse.json({ ok: true });
 }

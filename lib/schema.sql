@@ -47,7 +47,7 @@ create table if not exists quotes (
   id uuid primary key default gen_random_uuid(),
   quote_number text not null,
   date date not null default current_date,
-  client_id uuid references clients(id),
+  client_id uuid references clients(id) on delete set null,
   client_name text not null,
   client_phone text default '',
   client_email text default '',
@@ -87,7 +87,10 @@ create table if not exists jobs (
   id uuid primary key default gen_random_uuid(),
   job_number text not null,
   quote_id uuid references quotes(id),
-  client_id uuid references clients(id),
+  -- set null (not restrict) so deleting a client keeps their past quotes/
+  -- jobs, per the delete-confirmation copy in clients-app.js — client_name
+  -- below is the display fallback once client_id goes null.
+  client_id uuid references clients(id) on delete set null,
   asset_id uuid references assets(id),
   client_name text not null,
   job_description text default '',
@@ -119,7 +122,10 @@ create table if not exists employees (
 create table if not exists payroll_entries (
   id uuid primary key default gen_random_uuid(),
   pay_number text not null,
-  employee_id uuid references employees(id),
+  -- set null (not restrict) so deleting an employee keeps their past pay
+  -- runs, per the delete-confirmation copy in payroll-app.js — employee_name
+  -- below is the display fallback once employee_id goes null.
+  employee_id uuid references employees(id) on delete set null,
   employee_name text not null,
   hourly_rate numeric not null default 0,
   date_paid date,
@@ -227,7 +233,7 @@ insert into business_settings (id) values (1) on conflict (id) do nothing;
 -- app/api/maintenance-contracts/[id]/generate-job).
 create table if not exists maintenance_contracts (
   id uuid primary key default gen_random_uuid(),
-  client_id uuid references clients(id),
+  client_id uuid references clients(id) on delete set null,
   client_name text not null,
   title text not null default '',
   description text default '',

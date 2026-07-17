@@ -18,6 +18,9 @@ export async function POST(req, { params }) {
   const contracts = await sql`select * from maintenance_contracts where id = ${params.id}`;
   const contract = contracts[0];
   if (!contract) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  if (contract.status !== 'Active') {
+    return NextResponse.json({ error: 'Only an active contract can generate a job' }, { status: 400 });
+  }
 
   const numRows = await sql`update counters set value = value + 1 where key = 'job' returning value`;
   const jobNumber = 'J-' + String(numRows[0].value).padStart(4, '0');
