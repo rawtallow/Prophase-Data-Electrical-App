@@ -5,6 +5,7 @@ import { toast, confirmDialog } from '../ui-feedback';
 import Modal from '../modal';
 import { money, slug, toDateInputValue as dstr } from '../../../lib/format';
 import { CONTRACT_FREQUENCIES, CONTRACT_STATUSES } from '../../../lib/maintenance-frequency';
+import { getList } from '../../../lib/api';
 
 // Warns once a contract's next visit is within 14 days (or already overdue).
 function dueWarning(nextDueDate) {
@@ -24,8 +25,11 @@ export default function MaintenanceApp({ initialContracts, clients, canManage })
   const [busyId, setBusyId] = useState(null);
 
   async function refresh() {
-    const rows = await fetch('/api/maintenance-contracts').then((r) => r.json());
-    setContracts(rows);
+    try {
+      setContracts(await getList('/api/maintenance-contracts'));
+    } catch (err) {
+      toast.error(err.message);
+    }
   }
 
   function emptyContract() {

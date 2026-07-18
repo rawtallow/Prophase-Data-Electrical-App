@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { toast, confirmDialog } from '../ui-feedback';
 import Modal from '../modal';
 import { money, slug, toDateInputValue as dstr } from '../../../lib/format';
+import { getList } from '../../../lib/api';
 
 const STATUSES = ['Quoted', 'Scheduled', 'In Progress', 'Complete'];
 const PRIORITIES = ['High', 'Medium', 'Low'];
@@ -19,8 +20,11 @@ export default function JobsApp({ initialJobs, clients, assets, laborByJob, mate
   const [busyId, setBusyId] = useState(null);
 
   async function refresh() {
-    const rows = await fetch('/api/jobs').then((r) => r.json());
-    setJobs(rows);
+    try {
+      setJobs(await getList('/api/jobs'));
+    } catch (err) {
+      toast.error(err.message);
+    }
   }
 
   function emptyJob() {

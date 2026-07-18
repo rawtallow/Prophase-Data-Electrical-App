@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { toast, confirmDialog } from '../ui-feedback';
 import Modal from '../modal';
+import { getList } from '../../../lib/api';
 
 function emptySupplier() {
   return { name: '', accountNumber: '', contactName: '', phone: '', email: '', address: '', paymentTerms: '', portalUrl: '', notes: '' };
@@ -15,8 +16,11 @@ export default function SuppliersApp({ initialSuppliers, canManage }) {
   const [busyId, setBusyId] = useState(null);
 
   async function refresh() {
-    const rows = await fetch('/api/suppliers').then((r) => r.json());
-    setSuppliers(rows);
+    try {
+      setSuppliers(await getList('/api/suppliers'));
+    } catch (err) {
+      toast.error(err.message);
+    }
   }
 
   function openNew() { setModal(emptySupplier()); }

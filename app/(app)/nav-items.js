@@ -58,7 +58,15 @@ const PATHS = {
   users: ['M12 11.6a3.6 3.6 0 1 0 0-7.2 3.6 3.6 0 0 0 0 7.2Z', 'M5 20c0-3.6 3.1-6 7-6s7 2.4 7 6'],
   backup: ['M12 8.2c3.9 0 7-1.2 7-2.6S15.9 3 12 3 5 4.2 5 5.6 8.1 8.2 12 8.2Z', 'M5 5.6v6c0 1.4 3.1 2.6 7 2.6s7-1.2 7-2.6v-6', 'M5 11.6v6c0 1.4 3.1 2.6 7 2.6s7-1.2 7-2.6v-6'],
   po: ['M3.5 5h2.3l1 3.2M6.8 8.2h13l-1.6 7H9.2L6.8 8.2Z', 'M10 18.6a1.1 1.1 0 1 0 0 2.2 1.1 1.1 0 0 0 0-2.2Z', 'M17 18.6a1.1 1.1 0 1 0 0 2.2 1.1 1.1 0 0 0 0-2.2Z'],
-  suppliers: ['M4 21V9.5L12 4l8 5.5V21', 'M9 21v-6.5h6V21', 'M4 21h16'],
+  // A delivery truck, not the original warehouse outline — that read as a
+  // house and sat two rows below the Dashboard "home" icon in the drawer,
+  // which made the two genuinely easy to confuse at a glance.
+  suppliers: [
+    'M2.6 5.9h10.1v8.8H2.6z',
+    'M12.7 8.9h3.5l2.9 3v2.8h-6.4z',
+    'M7.2 14.6a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z',
+    'M17 14.6a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z'
+  ],
   menu: ['M4 7h16', 'M4 12h16', 'M4 17h16']
 };
 

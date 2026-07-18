@@ -63,7 +63,7 @@ export default function NavLinks({ role }) {
             onClick={() => (moreOpen ? setMoreOpen(false) : openMenu())}
             aria-expanded={moreOpen}
           >
-            <NavIcon name="menu" />More {moreOpen ? '▴' : '▾'}
+            <NavIcon name="menu" />More <span className="tabs-more-caret" aria-hidden="true">▾</span>
           </button>
           {moreOpen && (
             <div className="tabs-more-menu" ref={menuRef} style={{ top: menuPos.top, left: menuPos.left }}>

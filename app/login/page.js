@@ -39,21 +39,42 @@ export default function LoginPage() {
         <div className="brand">
           <div className="bolt">&#9889;</div>
           <div>
-            <h1 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#0a0a0a', textAlign: 'left' }}>
+            <h1 style={{ margin: 0, fontSize: 18, fontWeight: 750, color: '#0a0a0a', textAlign: 'left', letterSpacing: '-0.02em' }}>
               Prophase
             </h1>
           </div>
         </div>
-        <h1>Sign in to the portal</h1>
+        {/* Not an <h1>: the brand above already is one, and two competing
+            page titles is both wrong semantically and read oddly aloud. */}
+        <p className="auth-sub">Sign in to the portal</p>
         {error && <div className="error-box">{error}</div>}
         <form onSubmit={submit}>
           <div className="field">
-            <label>Email</label>
-            <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoFocus />
+            <label htmlFor="login-email">Email</label>
+            <input
+              id="login-email"
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoFocus
+              autoComplete="email"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck="false"
+              inputMode="email"
+            />
           </div>
           <div className="field">
-            <label>Password</label>
-            <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+            <label htmlFor="login-password">Password</label>
+            <input
+              id="login-password"
+              type="password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
+            />
           </div>
           <button className="btn amber" type="submit" disabled={busy} style={{ width: '100%', justifyContent: 'center' }}>
             {busy ? 'Signing in…' : 'Sign In'}

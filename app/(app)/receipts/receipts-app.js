@@ -4,6 +4,7 @@ import { toast, confirmDialog } from '../ui-feedback';
 import Modal from '../modal';
 import { RECEIPT_CATEGORIES } from '../../../lib/receipt-categories';
 import { money, toDateInputValue as dstr, toDisplayDate as fmtDate } from '../../../lib/format';
+import { getList } from '../../../lib/api';
 // Australian financial year: 1 July – 30 June.
 function financialYearStart() {
   const now = new Date();
@@ -53,8 +54,11 @@ export default function ReceiptsApp({ initialReceipts, canManage }) {
   const fileRef = useRef(null);
 
   async function refresh() {
-    const rows = await fetch('/api/receipts').then((r) => r.json());
-    setReceipts(rows);
+    try {
+      setReceipts(await getList('/api/receipts'));
+    } catch (err) {
+      toast.error(err.message);
+    }
   }
 
   function pickFile() { fileRef.current.click(); }

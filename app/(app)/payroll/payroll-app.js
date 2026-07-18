@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { toast, confirmDialog } from '../ui-feedback';
 import Modal from '../modal';
 import { money, toDateInputValue as dstr, toDisplayDate as fmtDate } from '../../../lib/format';
+import { getList } from '../../../lib/api';
 
 // toISOString() is UTC-based, so "today" near midnight local time can
 // resolve to the wrong calendar day (e.g. it read one day behind in
@@ -25,14 +26,18 @@ export default function PayrollApp({ initialEmployees, initialEntries, initialDr
   const [busyId, setBusyId] = useState(null);
 
   async function refreshAll() {
-    const [e, p, d] = await Promise.all([
-      fetch('/api/employees').then((r) => r.json()),
-      fetch('/api/payroll').then((r) => r.json()),
-      fetch('/api/draws').then((r) => r.json())
-    ]);
-    setEmployees(e);
-    setEntries(p);
-    setDraws(d);
+    try {
+      const [e, p, d] = await Promise.all([
+        getList('/api/employees'),
+        getList('/api/payroll'),
+        getList('/api/draws')
+      ]);
+      setEmployees(e);
+      setEntries(p);
+      setDraws(d);
+    } catch (err) {
+      toast.error(err.message);
+    }
   }
 
   // ---- summary cards ----

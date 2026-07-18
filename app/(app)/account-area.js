@@ -38,7 +38,9 @@ export default function AccountArea({ name, role }) {
           <span className="nm">{name}</span>
           <span className="rl">{role}</span>
         </span>
-        <span className="account-caret">{open ? '▴' : '▾'}</span>
+        {/* Stays a single glyph — CSS rotates it on aria-expanded so the
+            caret turns smoothly instead of swapping characters. */}
+        <span className="account-caret" aria-hidden="true">▾</span>
       </button>
       {open && (
         <div className="account-menu">

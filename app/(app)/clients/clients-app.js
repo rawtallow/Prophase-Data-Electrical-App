@@ -4,6 +4,7 @@ import { toast, confirmDialog } from '../ui-feedback';
 import Modal from '../modal';
 import { slug } from '../../../lib/format';
 import { LEAD_SOURCES } from '../../../lib/lead-sources';
+import { getList } from '../../../lib/api';
 
 export default function ClientsApp({ initialClients, initialAssets, jobsByAsset, canManage }) {
   const [clients, setClients] = useState(initialClients);
@@ -23,12 +24,13 @@ export default function ClientsApp({ initialClients, initialAssets, jobsByAsset,
   }
 
   async function refresh() {
-    const [c, a] = await Promise.all([
-      fetch('/api/clients').then((r) => r.json()),
-      fetch('/api/assets').then((r) => r.json())
-    ]);
-    setClients(c);
-    setAssets(a);
+    try {
+      const [c, a] = await Promise.all([getList('/api/clients'), getList('/api/assets')]);
+      setClients(c);
+      setAssets(a);
+    } catch (err) {
+      toast.error(err.message);
+    }
   }
 
   async function saveClient(form) {

@@ -4,6 +4,7 @@ import { toast, confirmDialog } from '../ui-feedback';
 import Modal from '../modal';
 import { COMPLIANCE_TYPES, COMPLIANCE_RESULTS } from '../../../lib/compliance-types';
 import { slug, toDateInputValue as dstr } from '../../../lib/format';
+import { getList } from '../../../lib/api';
 
 // toISOString() is UTC-based, so "today" near midnight local time can
 // resolve to the wrong calendar day (e.g. it read one day behind in
@@ -39,8 +40,11 @@ export default function ComplianceApp({ initialRecords, jobs, clients, employees
   const [savingBiz, setSavingBiz] = useState(false);
 
   async function refresh() {
-    const rows = await fetch('/api/compliance').then((r) => r.json());
-    setRecords(rows);
+    try {
+      setRecords(await getList('/api/compliance'));
+    } catch (err) {
+      toast.error(err.message);
+    }
   }
 
   function openBizEdit() {

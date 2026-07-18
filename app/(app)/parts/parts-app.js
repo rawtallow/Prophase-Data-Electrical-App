@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { toast, confirmDialog } from '../ui-feedback';
 import Modal from '../modal';
 import { money } from '../../../lib/format';
+import { getList } from '../../../lib/api';
 
 function isLow(p) {
   return Number(p.reorder_threshold) > 0 && Number(p.qty_on_hand) <= Number(p.reorder_threshold);
@@ -16,8 +17,11 @@ export default function PartsApp({ initialParts, canManage }) {
   const [busyId, setBusyId] = useState(null);
 
   async function refresh() {
-    const rows = await fetch('/api/parts').then((r) => r.json());
-    setParts(rows);
+    try {
+      setParts(await getList('/api/parts'));
+    } catch (err) {
+      toast.error(err.message);
+    }
   }
 
   function emptyPart() {
@@ -70,8 +74,13 @@ export default function PartsApp({ initialParts, canManage }) {
   async function adjust(id, delta) {
     setBusyId(id);
     try {
-      await fetch(`/api/parts/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ delta }) });
-      await refresh();
+      const res = await fetch(`/api/parts/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ delta }) });
+      if (res.ok) {
+        await refresh();
+      } else {
+        const d = await res.json().catch(() => ({}));
+        toast.error(d.error || 'Could not update stock');
+      }
     } finally {
       setBusyId(null);
     }

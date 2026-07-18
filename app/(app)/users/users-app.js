@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { toast, confirmDialog } from '../ui-feedback';
 import Modal from '../modal';
 import { toDisplayDate as fmtDate } from '../../../lib/format';
+import { getList } from '../../../lib/api';
 
 export default function UsersApp({ initialUsers, myId }) {
   const [users, setUsers] = useState(initialUsers);
@@ -12,8 +13,11 @@ export default function UsersApp({ initialUsers, myId }) {
   const [busyId, setBusyId] = useState(null);
 
   async function refresh() {
-    const rows = await fetch('/api/users').then((r) => r.json());
-    setUsers(rows);
+    try {
+      setUsers(await getList('/api/users'));
+    } catch (err) {
+      toast.error(err.message);
+    }
   }
 
   function openNew() { setModal({ name: '', email: '', role: 'employee', active: true, password: '' }); setError(''); }

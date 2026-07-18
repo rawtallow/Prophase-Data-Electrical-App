@@ -48,16 +48,35 @@ export default function SetupPage() {
         {error && <div className="error-box">{error}</div>}
         <form onSubmit={submit}>
           <div className="field">
-            <label>Your Name</label>
-            <input required value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+            <label htmlFor="setup-name">Your Name</label>
+            <input id="setup-name" required value={name} onChange={(e) => setName(e.target.value)} autoFocus autoComplete="name" />
           </div>
           <div className="field">
-            <label>Email</label>
-            <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+            <label htmlFor="setup-email">Email</label>
+            <input
+              id="setup-email"
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck="false"
+              inputMode="email"
+            />
           </div>
           <div className="field">
-            <label>Password (min. 8 characters)</label>
-            <input type="password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} />
+            <label htmlFor="setup-password">Password (min. 8 characters)</label>
+            <input
+              id="setup-password"
+              type="password"
+              required
+              minLength={8}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="new-password"
+            />
           </div>
           <button className="btn amber" type="submit" disabled={busy} style={{ width: '100%', justifyContent: 'center' }}>
             {busy ? 'Creating…' : 'Create Admin Account'}

@@ -55,11 +55,25 @@ export function FeedbackHost() {
     resolve?.(value);
   }
 
+  // Click a toast to dismiss it early rather than waiting out the timer —
+  // it plays the same leave animation so it never just blinks out.
+  function dismiss(id) {
+    setToasts((cur) => cur.map((x) => (x.id === id ? { ...x, leaving: true } : x)));
+    setTimeout(() => setToasts((cur) => cur.filter((x) => x.id !== id)), TOAST_LEAVE_MS);
+  }
+
   return (
     <>
       <div className="toast-stack">
         {toasts.map((t) => (
-          <div key={t.id} className={`toast toast-${t.type}${t.leaving ? ' leaving' : ''}`}>{t.message}</div>
+          <div
+            key={t.id}
+            className={`toast toast-${t.type}${t.leaving ? ' leaving' : ''}`}
+            role="status"
+            onClick={() => dismiss(t.id)}
+          >
+            {t.message}
+          </div>
         ))}
       </div>
       <Modal open={!!confirmState} onBackdropClick={() => respond(false)}>

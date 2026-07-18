@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { toast, confirmDialog } from '../ui-feedback';
 import Modal from '../modal';
 import { money, slug, toDateInputValue as dstr } from '../../../lib/format';
+import { getJson, getList } from '../../../lib/api';
 
 const APPROVAL_STATUSES = ['Pending Approval', 'Approved', 'Rejected'];
 const STATUSES = ['Draft', 'Sent', 'Partially Received', 'Received', 'Cancelled'];
@@ -19,8 +20,11 @@ export default function PurchaseOrdersApp({ initialOrders, myId, fullAccess }) {
   const [receiving, setReceiving] = useState(false);
 
   async function refresh() {
-    const rows = await fetch('/api/purchase-orders').then((r) => r.json());
-    setOrders(rows);
+    try {
+      setOrders(await getList('/api/purchase-orders'));
+    } catch (err) {
+      toast.error(err.message);
+    }
   }
 
   function canEditOrDelete(po) {
@@ -76,7 +80,7 @@ export default function PurchaseOrdersApp({ initialOrders, myId, fullAccess }) {
   async function openReceive(po) {
     setBusyId(po.id);
     try {
-      const full = await fetch(`/api/purchase-orders/${po.id}`).then((r) => r.json());
+      const full = await getJson(`/api/purchase-orders/${po.id}`);
       const lines = (full.lineItems || []).map((li) => ({
         id: li.id,
         description: li.description,
@@ -85,6 +89,8 @@ export default function PurchaseOrdersApp({ initialOrders, myId, fullAccess }) {
         qtyNow: Math.max(Number(li.qty) - Number(li.qty_received), 0)
       }));
       setReceiveModal({ po, lines });
+    } catch (err) {
+      toast.error(err.message);
     } finally {
       setBusyId(null);
     }

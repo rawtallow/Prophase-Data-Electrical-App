@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { toast, confirmDialog } from '../ui-feedback';
 import Modal from '../modal';
 import { money, slug, toDateInputValue as dstr } from '../../../lib/format';
+import { getList } from '../../../lib/api';
 
 const APPROVAL_STATUSES = ['Pending Approval', 'Approved', 'Rejected'];
 const STALE_DAYS = 10;
@@ -27,8 +28,11 @@ export default function QuotesApp({ initialQuotes, myId, fullAccess }) {
   const [reviewing, setReviewing] = useState(false);
 
   async function refresh() {
-    const rows = await fetch('/api/quotes').then((r) => r.json());
-    setQuotes(rows);
+    try {
+      setQuotes(await getList('/api/quotes'));
+    } catch (err) {
+      toast.error(err.message);
+    }
   }
 
   function canEditOrDelete(q) {
