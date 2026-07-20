@@ -9,7 +9,7 @@ export const runtime = 'nodejs';
 // raw Date crosses NextResponse.json() (JSON.stringify -> UTC toJSON), it can
 // land on the wrong calendar day for servers running outside UTC. See
 // lib/format.js's serializeDates for the full explanation.
-const QUOTE_DATE_FIELDS = ['date'];
+const QUOTE_DATE_FIELDS = ['date', 'valid_until'];
 
 async function nextQuoteNumber() {
   const rows = await sql`update counters set value = value + 1 where key = 'quote' returning value`;
@@ -38,7 +38,7 @@ export async function POST(req) {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const body = await req.json();
-  const { clientId, clientName, clientPhone, clientEmail, clientAddress, jobDescription, lineItems, taxRate, discount, status, notes } = body;
+  const { clientId, clientName, clientPhone, clientEmail, clientAddress, jobDescription, lineItems, taxRate, discount, status, notes, internalNotes, validUntil } = body;
 
   if (!clientName || !clientName.trim()) return NextResponse.json({ error: 'Customer name is required' }, { status: 400 });
   const cleanItems = (lineItems || []).filter((li) => (li.description || '').trim() !== '' || (Number(li.qty) || 0) * (Number(li.price) || 0) !== 0);
@@ -46,6 +46,10 @@ export async function POST(req) {
 
   const { subtotal, tax, total } = computeTotals(cleanItems, taxRate, discount);
   const quoteNumber = await nextQuoteNumber();
+  const today = sydneyToday();
+  // Standard trade-quote practice, same window the print page used to
+  // compute on the fly — now a real column so it can be overridden per quote.
+  const defaultValidUntil = new Date(new Date(today).getTime() + 30 * 86400000).toISOString().slice(0, 10);
 
   // Employees can draft, but their quotes need manager/admin sign-off
   // before they can be sent — a manager/admin's own quote is auto-approved
@@ -56,10 +60,10 @@ export async function POST(req) {
 
   const rows = await sql`
     insert into quotes (quote_number, date, client_id, client_name, client_phone, client_email, client_address, job_description,
-      tax_rate, discount, subtotal, tax, total, status, notes, approval_status, created_by_id, created_by)
-    values (${quoteNumber}, ${sydneyToday()}, ${clientId || null}, ${clientName.trim()}, ${clientPhone || ''}, ${clientEmail || ''}, ${clientAddress || ''},
+      tax_rate, discount, subtotal, tax, total, status, notes, internal_notes, valid_until, approval_status, created_by_id, created_by, updated_at)
+    values (${quoteNumber}, ${today}, ${clientId || null}, ${clientName.trim()}, ${clientPhone || ''}, ${clientEmail || ''}, ${clientAddress || ''},
       ${jobDescription || ''}, ${Number(taxRate) || 0}, ${Number(discount) || 0}, ${subtotal}, ${tax}, ${total}, ${finalStatus}, ${notes || ''},
-      ${approvalStatus}, ${session.id}, ${session.name})
+      ${internalNotes || ''}, ${validUntil || defaultValidUntil}, ${approvalStatus}, ${session.id}, ${session.name}, now())
     returning *
   `;
   const quote = rows[0];

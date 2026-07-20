@@ -91,6 +91,15 @@ create table if not exists quotes (
   reviewed_by text default ''
 );
 
+-- Added for the tabbed Quote Details page. valid_until was previously just
+-- computed on the fly as date+30 (see the print page) — now a real, editable
+-- column, defaulted to date+30 at creation but overridable afterward.
+-- internal_notes is admin/manager-only and never printed, unlike the
+-- existing customer-facing `notes` field. updated_at is bumped on every PUT.
+alter table quotes add column if not exists valid_until date;
+alter table quotes add column if not exists internal_notes text default '';
+alter table quotes add column if not exists updated_at timestamptz;
+
 create table if not exists quote_line_items (
   id uuid primary key default gen_random_uuid(),
   quote_id uuid references quotes(id) on delete cascade,

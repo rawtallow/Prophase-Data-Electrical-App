@@ -28,9 +28,14 @@ export async function POST(req) {
     // references jobs/clients/employees, so it must go before all three;
     // maintenance_contracts references clients, so before clients too.
     // purchase_order_line_items/purchase_orders reference jobs and suppliers,
-    // so both must go before jobs and before suppliers.
+    // so both must go before jobs and before suppliers. The three
+    // purchase_order_invoice* tables reference purchase_orders (and each
+    // other), so they must go before purchase_orders too.
     sql`delete from compliance_records`,
     sql`delete from maintenance_contracts`,
+    sql`delete from purchase_order_invoice_payments`,
+    sql`delete from purchase_order_invoice_line_items`,
+    sql`delete from purchase_order_invoices`,
     sql`delete from purchase_order_line_items`,
     sql`delete from purchase_orders`,
     sql`delete from payroll_allocations`,
@@ -186,6 +191,32 @@ export async function POST(req) {
       queries.push(sql`
         insert into purchase_order_line_items (id, purchase_order_id, part_id, description, qty, unit_cost, qty_received, sort_order)
         values (${li.id}, ${li.purchase_order_id}, ${li.part_id || null}, ${li.description}, ${li.qty}, ${li.unit_cost}, ${li.qty_received}, ${li.sort_order})
+      `);
+    }
+  }
+  // Needs purchase_orders already inserted (loop above). Line items/payments
+  // need purchase_order_invoices inserted first, hence the ordering here.
+  if (Array.isArray(data.purchaseOrderInvoices)) {
+    for (const pi of data.purchaseOrderInvoices) {
+      queries.push(sql`
+        insert into purchase_order_invoices (id, purchase_order_id, invoice_number, invoice_date, subtotal, tax, total, amount_paid, status, notes, created_by, created_at)
+        values (${pi.id}, ${pi.purchase_order_id}, ${pi.invoice_number || ''}, ${pi.invoice_date}, ${pi.subtotal}, ${pi.tax}, ${pi.total}, ${pi.amount_paid}, ${pi.status || 'Unpaid'}, ${pi.notes || ''}, ${pi.created_by || ''}, ${pi.created_at})
+      `);
+    }
+  }
+  if (Array.isArray(data.purchaseOrderInvoiceLineItems)) {
+    for (const li of data.purchaseOrderInvoiceLineItems) {
+      queries.push(sql`
+        insert into purchase_order_invoice_line_items (id, purchase_order_invoice_id, po_line_item_id, description, qty, unit_cost, sort_order)
+        values (${li.id}, ${li.purchase_order_invoice_id}, ${li.po_line_item_id || null}, ${li.description || ''}, ${li.qty}, ${li.unit_cost}, ${li.sort_order})
+      `);
+    }
+  }
+  if (Array.isArray(data.purchaseOrderInvoicePayments)) {
+    for (const p of data.purchaseOrderInvoicePayments) {
+      queries.push(sql`
+        insert into purchase_order_invoice_payments (id, purchase_order_invoice_id, date, amount, method, note, created_by, created_at)
+        values (${p.id}, ${p.purchase_order_invoice_id}, ${p.date}, ${p.amount}, ${p.method || ''}, ${p.note || ''}, ${p.created_by || ''}, ${p.created_at})
       `);
     }
   }

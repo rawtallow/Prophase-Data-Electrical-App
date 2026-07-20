@@ -8,7 +8,7 @@ export async function GET() {
   const session = await getSession();
   if (!session || !CAN.backup(session.role)) return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
 
-  const [clients, assets, quotes, quoteLineItems, jobs, jobLineItems, jobPayments, employees, payrollEntries, payrollAllocations, ownerDraws, parts, counters, receipts, complianceRecords, businessSettings, maintenanceContracts, suppliers, purchaseOrders, purchaseOrderLineItems] = await Promise.all([
+  const [clients, assets, quotes, quoteLineItems, jobs, jobLineItems, jobPayments, employees, payrollEntries, payrollAllocations, ownerDraws, parts, counters, receipts, complianceRecords, businessSettings, maintenanceContracts, suppliers, purchaseOrders, purchaseOrderLineItems, purchaseOrderInvoices, purchaseOrderInvoiceLineItems, purchaseOrderInvoicePayments] = await Promise.all([
     sql`select * from clients`,
     sql`select * from assets`,
     sql`select * from quotes`,
@@ -28,12 +28,15 @@ export async function GET() {
     sql`select * from maintenance_contracts`,
     sql`select * from suppliers`,
     sql`select * from purchase_orders`,
-    sql`select * from purchase_order_line_items`
+    sql`select * from purchase_order_line_items`,
+    sql`select * from purchase_order_invoices`,
+    sql`select * from purchase_order_invoice_line_items`,
+    sql`select * from purchase_order_invoice_payments`
   ]);
 
   const dump = {
     exportedAt: new Date().toISOString(),
-    clients, assets, quotes, quoteLineItems, jobs, jobLineItems, jobPayments, employees, payrollEntries, payrollAllocations, ownerDraws, parts, counters, receipts, complianceRecords, businessSettings, maintenanceContracts, suppliers, purchaseOrders, purchaseOrderLineItems
+    clients, assets, quotes, quoteLineItems, jobs, jobLineItems, jobPayments, employees, payrollEntries, payrollAllocations, ownerDraws, parts, counters, receipts, complianceRecords, businessSettings, maintenanceContracts, suppliers, purchaseOrders, purchaseOrderLineItems, purchaseOrderInvoices, purchaseOrderInvoiceLineItems, purchaseOrderInvoicePayments
   };
 
   return new NextResponse(JSON.stringify(dump, null, 2), {

@@ -182,6 +182,27 @@ a { color: inherit; }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
+/* Per-row "⋮" options menu (Quotes list, etc.) — same shape as .account-menu
+   above, just anchored to a table cell instead of the header. */
+.row-menu { position: relative; display: inline-block; }
+.row-menu-trigger {
+  background: transparent; border: 1px solid transparent; cursor: pointer;
+  border-radius: var(--r-sm); width: 32px; height: 32px; font-size: 18px; line-height: 1;
+  color: var(--text-faint); font-family: inherit;
+  transition: background-color var(--dur) var(--ease), border-color var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.row-menu-trigger:hover { background: var(--bg-soft); border-color: var(--border); color: var(--text); }
+.row-menu-list {
+  position: absolute; top: calc(100% + 6px); right: 0;
+  min-width: 170px; z-index: 85;
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--r);
+  box-shadow: var(--sh-lg); padding: 6px; overflow: hidden;
+  display: flex; flex-direction: column; gap: 2px;
+  transform-origin: top right;
+  animation: menuIn var(--dur) var(--ease-out);
+}
+.row-menu-list .btn { width: 100%; justify-content: flex-start; margin: 0 !important; box-shadow: none; }
+
 /* ============================================================
    DESKTOP TOP NAV
    ============================================================ */
@@ -562,18 +583,18 @@ select {
 }
 /* warn / in-flight */
 .badge.sent, .badge.inprogress, .badge.medium, .badge.rcdsafetyswitchtest,
-.badge.pendingapproval, .badge.paused {
+.badge.pendingapproval, .badge.paused, .badge.partiallypaid {
   background: var(--b-warn-bg); color: var(--b-warn-fg); border-color: rgba(146, 64, 14, 0.14);
 }
 /* good */
 .badge.accepted, .badge.complete, .badge.activestatus, .badge.instock,
 .badge.scheduledpreventativemaintenance, .badge.compliant, .badge.approved,
-.badge.referral, .badge.wordofmouth, .badge.active {
+.badge.referral, .badge.wordofmouth, .badge.active, .badge.paid {
   background: var(--b-good-bg); color: var(--b-good-fg); border-color: rgba(21, 128, 61, 0.14);
 }
 /* bad */
 .badge.declined, .badge.lowstock, .badge.high, .badge.noncompliant,
-.badge.rejected, .badge.cancelled {
+.badge.rejected, .badge.cancelled, .badge.unpaid {
   background: var(--b-bad-bg); color: var(--b-bad-fg); border-color: rgba(185, 28, 28, 0.14);
 }
 /* info */

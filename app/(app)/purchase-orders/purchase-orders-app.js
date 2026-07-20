@@ -3,11 +3,13 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast, confirmDialog } from '../ui-feedback';
 import Modal from '../modal';
-import { money, slug, toDateInputValue as dstr } from '../../../lib/format';
+import { money, slug, toDateInputValue as dstr, sydneyToday } from '../../../lib/format';
 import { getJson, getList } from '../../../lib/api';
 
 const APPROVAL_STATUSES = ['Pending Approval', 'Approved', 'Rejected'];
 const STATUSES = ['Draft', 'Sent', 'Partially Received', 'Received', 'Cancelled'];
+
+function emptyInvoiceForm() { return { invoiceNumber: '', invoiceDate: sydneyToday() }; }
 
 export default function PurchaseOrdersApp({ initialOrders, myId, fullAccess }) {
   const router = useRouter();
@@ -19,8 +21,10 @@ export default function PurchaseOrdersApp({ initialOrders, myId, fullAccess }) {
   const [creating, setCreating] = useState(false);
   const [reviewModal, setReviewModal] = useState(null); // { po, note }
   const [reviewing, setReviewing] = useState(false);
-  const [receiveModal, setReceiveModal] = useState(null); // { po, lines: [{ id, description, qty, qty_received, qtyNow }] }
+  const [receiveModal, setReceiveModal] = useState(null); // { po, lines: [{ id, description, qty, qtyReceived, qtyNow, unitCost, poUnitCost }] }
   const [receiving, setReceiving] = useState(false);
+  const [logInvoice, setLogInvoice] = useState(false);
+  const [invoiceForm, setInvoiceForm] = useState(emptyInvoiceForm());
 
   // Wholesalers require a PO number before they'll quote a price, so this
   // reserves a real, permanent number immediately (see the draft route's
@@ -111,9 +115,13 @@ export default function PurchaseOrdersApp({ initialOrders, myId, fullAccess }) {
         description: li.description,
         qty: Number(li.qty),
         qtyReceived: Number(li.qty_received),
-        qtyNow: Math.max(Number(li.qty) - Number(li.qty_received), 0)
+        qtyNow: Math.max(Number(li.qty) - Number(li.qty_received), 0),
+        unitCost: Number(li.unit_cost),
+        poUnitCost: Number(li.unit_cost)
       }));
       setReceiveModal({ po, lines });
+      setLogInvoice(false);
+      setInvoiceForm(emptyInvoiceForm());
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -126,20 +134,37 @@ export default function PurchaseOrdersApp({ initialOrders, myId, fullAccess }) {
       lines: receiveModal.lines.map((l) => (l.id === lineId ? { ...l, qtyNow: value } : l))
     });
   }
+  function updateReceiveCost(lineId, value) {
+    setReceiveModal({
+      ...receiveModal,
+      lines: receiveModal.lines.map((l) => (l.id === lineId ? { ...l, unitCost: value } : l))
+    });
+  }
   async function submitReceive() {
-    const lines = receiveModal.lines
-      .filter((l) => (Number(l.qtyNow) || 0) > 0)
-      .map((l) => ({ lineItemId: l.id, qtyNow: Number(l.qtyNow) || 0 }));
+    const receivingLines = receiveModal.lines.filter((l) => (Number(l.qtyNow) || 0) > 0);
+    const lines = receivingLines.map((l) => ({ lineItemId: l.id, qtyNow: Number(l.qtyNow) || 0 }));
     if (lines.length === 0) return toast.error('Enter a quantity for at least one item');
+    if (logInvoice && !invoiceForm.invoiceNumber.trim()) return toast.error("Enter the supplier's invoice number");
+
+    const body = { lines };
+    if (logInvoice) {
+      body.invoice = {
+        invoiceNumber: invoiceForm.invoiceNumber,
+        invoiceDate: invoiceForm.invoiceDate,
+        lines: receivingLines.map((l) => ({ lineItemId: l.id, unitCost: Number(l.unitCost) || 0 }))
+      };
+    }
+
     setReceiving(true);
     try {
       const res = await fetch(`/api/purchase-orders/${receiveModal.po.id}/receive`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lines })
+        body: JSON.stringify(body)
       });
       if (res.ok) {
-        toast.success('Received items logged — stock updated');
+        const result = await res.json();
+        toast.success(result.invoiceId ? 'Received items logged — invoice recorded' : 'Received items logged — stock updated');
         setReceiveModal(null);
         await refresh();
       } else {
@@ -259,25 +284,71 @@ export default function PurchaseOrdersApp({ initialOrders, myId, fullAccess }) {
             <h3>Receive Items — {receiveModal.po.po_number}</h3>
             <p className="small-note">{receiveModal.po.supplier_name}. Enter how many of each item arrived — defaults to what's still outstanding.</p>
             <table>
-              <thead><tr><th>Item</th><th className="num">Ordered</th><th className="num">Already Received</th><th className="num">Receiving Now</th></tr></thead>
+              <thead>
+                <tr>
+                  <th>Item</th><th className="num">Ordered</th><th className="num">Already Received</th><th className="num">Receiving Now</th>
+                  {fullAccess && logInvoice && <th className="num">Invoice Cost</th>}
+                </tr>
+              </thead>
               <tbody>
-                {receiveModal.lines.map((l) => (
-                  <tr key={l.id}>
-                    <td>{l.description}</td>
-                    <td className="num">{l.qty}</td>
-                    <td className="num">{l.qtyReceived}</td>
-                    <td className="num">
-                      <input
-                        type="number" min="0" step="0.01"
-                        max={Math.max(l.qty - l.qtyReceived, 0)}
-                        value={l.qtyNow}
-                        onChange={(e) => updateReceiveQty(l.id, e.target.value)}
-                      />
-                    </td>
-                  </tr>
-                ))}
+                {receiveModal.lines.map((l) => {
+                  const receivingNow = (Number(l.qtyNow) || 0) > 0;
+                  const mismatch = receivingNow && Number(l.unitCost) !== l.poUnitCost;
+                  return (
+                    <tr key={l.id}>
+                      <td>{l.description}</td>
+                      <td className="num">{l.qty}</td>
+                      <td className="num">{l.qtyReceived}</td>
+                      <td className="num">
+                        <input
+                          type="number" min="0" step="0.01"
+                          max={Math.max(l.qty - l.qtyReceived, 0)}
+                          value={l.qtyNow}
+                          onChange={(e) => updateReceiveQty(l.id, e.target.value)}
+                        />
+                      </td>
+                      {fullAccess && logInvoice && (
+                        <td className="num">
+                          <input
+                            type="number" min="0" step="0.01"
+                            disabled={!receivingNow}
+                            value={l.unitCost}
+                            onChange={(e) => updateReceiveCost(l.id, e.target.value)}
+                          />
+                          {mismatch && (
+                            <div className="small-note" style={{ color: 'var(--amber-dark)', whiteSpace: 'nowrap' }}>
+                              ≠ PO: {money(l.poUnitCost)}
+                            </div>
+                          )}
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
+
+            {fullAccess && (
+              <div className="panel" style={{ marginTop: 14, background: 'var(--bg-soft)' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={logInvoice} onChange={(e) => setLogInvoice(e.target.checked)} />
+                  Also log the supplier's invoice for this delivery
+                </label>
+                {logInvoice && (
+                  <div className="grid-2" style={{ marginTop: 10 }}>
+                    <div className="field">
+                      <label>Invoice Number *</label>
+                      <input value={invoiceForm.invoiceNumber} onChange={(e) => setInvoiceForm({ ...invoiceForm, invoiceNumber: e.target.value })} />
+                    </div>
+                    <div className="field">
+                      <label>Invoice Date</label>
+                      <input type="date" value={invoiceForm.invoiceDate} onChange={(e) => setInvoiceForm({ ...invoiceForm, invoiceDate: e.target.value })} />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="modal-actions">
               <button className="btn ghost" disabled={receiving} onClick={() => setReceiveModal(null)}>Cancel</button>
               <button className="btn amber" disabled={receiving} onClick={submitReceive}>{receiving ? 'Saving…' : 'Log Received Items'}</button>

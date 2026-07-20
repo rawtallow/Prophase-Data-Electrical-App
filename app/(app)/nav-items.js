@@ -27,6 +27,7 @@ export const NAV_ITEMS = [
   { href: '/statistics', label: 'Statistics', icon: 'stats', section: 'Management', show: fullAccess },
   { href: '/payroll', label: 'Payroll', icon: 'payroll', section: 'Management', show: fullAccess },
   { href: '/suppliers', label: 'Suppliers', icon: 'suppliers', section: 'Management', show: fullAccess },
+  { href: '/supplier-invoices', label: 'Supplier Invoices', short: 'Invoices', icon: 'supplierInvoices', section: 'Management', show: fullAccess },
   { href: '/maintenance', label: 'Maintenance', icon: 'maintenance', section: 'Management', show: fullAccess },
   { href: '/documents', label: 'Documents', icon: 'documents', section: 'Management', show: fullAccess },
   { href: '/users', label: 'Users', icon: 'users', section: 'Management', show: (role) => role === 'admin' },
@@ -67,7 +68,16 @@ const PATHS = {
     'M7.2 14.6a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z',
     'M17 14.6a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z'
   ],
-  menu: ['M4 7h16', 'M4 12h16', 'M4 17h16']
+  menu: ['M4 7h16', 'M4 12h16', 'M4 17h16'],
+  // A bill/invoice sheet with a dollar mark — distinct from the plain
+  // scalloped "receipts" icon (personal expense photos) since this is a
+  // different concept: money owed to suppliers against a specific PO.
+  supplierInvoices: [
+    'M5.5 3h9l4 4v14h-13z',
+    'M14.5 3v4h4',
+    'M12 8.6v8.8',
+    'M14.2 10.4a2.3 2.3 0 0 0-2.2-1.4c-1.4 0-2.3.8-2.3 1.8s.9 1.5 2.3 1.7c1.4.2 2.3.7 2.3 1.7s-.9 1.8-2.3 1.8a2.3 2.3 0 0 1-2.2-1.4'
+  ]
 };
 
 export function NavIcon({ name }) {

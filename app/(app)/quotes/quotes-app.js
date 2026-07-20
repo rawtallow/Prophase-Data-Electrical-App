@@ -1,8 +1,7 @@
 'use client';
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast, confirmDialog } from '../ui-feedback';
-import Modal from '../modal';
 import { money, slug, toDateInputValue as dstr } from '../../../lib/format';
 import { getList } from '../../../lib/api';
 
@@ -17,6 +16,31 @@ function isStale(q) {
   return days >= STALE_DAYS;
 }
 
+// Small per-row "⋮" options menu for the less-frequent actions — everything
+// else (viewing, editing, reviewing) now happens by clicking into the
+// quote's own detail page. Same open/outside-click/stopPropagation shape as
+// account-area.js's dropdown, just anchored to a table cell instead of the
+// header, and stopping its clicks from also triggering the row's own
+// navigate-to-detail-page handler.
+function RowMenu({ children }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onClickOutside(e) { if (!ref.current?.contains(e.target)) setOpen(false); }
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, [open]);
+
+  return (
+    <div className="row-menu" ref={ref} onClick={(e) => e.stopPropagation()}>
+      <button type="button" className="row-menu-trigger" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-label="More actions">⋮</button>
+      {open && <div className="row-menu-list" onClick={() => setOpen(false)}>{children}</div>}
+    </div>
+  );
+}
+
 export default function QuotesApp({ initialQuotes, myId, fullAccess }) {
   const router = useRouter();
   const [quotes, setQuotes] = useState(initialQuotes);
@@ -24,8 +48,6 @@ export default function QuotesApp({ initialQuotes, myId, fullAccess }) {
   const [approvalFilter, setApprovalFilter] = useState('');
   const [search, setSearch] = useState('');
   const [busyId, setBusyId] = useState(null);
-  const [reviewModal, setReviewModal] = useState(null); // { quote, note }
-  const [reviewing, setReviewing] = useState(false);
 
   async function refresh() {
     try {
@@ -65,13 +87,16 @@ export default function QuotesApp({ initialQuotes, myId, fullAccess }) {
     try {
       const res = await fetch(`/api/quotes/${id}/duplicate`, { method: 'POST' });
       if (res.ok) {
+        const created = await res.json();
         toast.success('Quote duplicated');
-        await refresh();
+        router.push(`/quotes/${created.id}`);
       } else {
         const d = await res.json().catch(() => ({}));
         toast.error(d.error || 'Could not duplicate quote');
+        setBusyId(null);
       }
-    } finally {
+    } catch {
+      toast.error('Could not duplicate quote');
       setBusyId(null);
     }
   }
@@ -82,34 +107,14 @@ export default function QuotesApp({ initialQuotes, myId, fullAccess }) {
       if (res.ok) {
         toast.success('Converted to a job');
         router.push('/jobs');
-        router.refresh();
       } else {
         const d = await res.json().catch(() => ({}));
         toast.error(d.error || 'Could not convert to job');
+        setBusyId(null);
       }
-    } finally {
+    } catch {
+      toast.error('Could not convert to job');
       setBusyId(null);
-    }
-  }
-
-  async function submitReview(decision) {
-    setReviewing(true);
-    try {
-      const res = await fetch(`/api/quotes/${reviewModal.quote.id}/review`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ decision, note: reviewModal.note })
-      });
-      if (res.ok) {
-        toast.success(decision === 'approved' ? 'Quote approved' : 'Quote sent back to the drafter');
-        setReviewModal(null);
-        await refresh();
-      } else {
-        const d = await res.json().catch(() => ({}));
-        toast.error(d.error || 'Could not save review');
-      }
-    } finally {
-      setReviewing(false);
     }
   }
 
@@ -155,17 +160,17 @@ export default function QuotesApp({ initialQuotes, myId, fullAccess }) {
           <thead>
             <tr>
               <th>Quote #</th><th>Customer</th><th>Date</th><th>Approval</th><th>Status</th>
-              <th className="num">Total</th><th>Created By</th><th>Actions</th>
+              <th className="num">Total</th><th>Created By</th><th></th>
             </tr>
           </thead>
           <tbody>
             {list.map((q) => {
               const busy = busyId === q.id;
-              const canReview = fullAccess && q.approval_status === 'Pending Approval';
               const canPrint = fullAccess && q.approval_status === 'Approved';
+              const canConvert = canPrint && (q.status === 'Draft' || q.status === 'Sent');
               return (
-                <tr key={q.id}>
-                  <td data-label="Quote #">{q.quote_number}</td>
+                <tr key={q.id} onClick={() => router.push(`/quotes/${q.id}`)} style={{ cursor: 'pointer' }}>
+                  <td data-label="Quote #" style={{ color: 'var(--amber-dark)', fontWeight: 650 }}>{q.quote_number}</td>
                   <td data-label="Customer">{q.client_name}</td>
                   <td data-label="Date">
                     {dstr(q.date)}
@@ -181,23 +186,13 @@ export default function QuotesApp({ initialQuotes, myId, fullAccess }) {
                   <td className="num" data-label="Total">{money(q.total)}</td>
                   <td data-label="Created By">{q.created_by || '—'}</td>
                   <td className="cell-actions" data-label="">
-                    <div className="row-actions">
-                      {canReview && (
-                        <button className="btn amber sm" disabled={busy} onClick={() => setReviewModal({ quote: q, note: '' })}>
-                          Review
-                        </button>
-                      )}
-                      {canEditOrDelete(q) && <a className="btn ghost sm" href={`/quotes/${q.id}/edit`}>Edit</a>}
+                    <RowMenu>
                       {canPrint && <a className="btn ghost sm" href={`/quotes/${q.id}/print`} target="_blank" rel="noreferrer">Print</a>}
-                      {canPrint && <a className="btn ghost sm" href={`/api/quotes/${q.id}/agreement`}>Agreement</a>}
-                      {fullAccess && <button className="btn ghost sm" disabled={busy} onClick={() => duplicate(q.id)}>Duplicate</button>}
-                      {canPrint && (q.status === 'Draft' || q.status === 'Sent') && (
-                        <button className="btn amber sm" disabled={busy} onClick={() => convert(q.id)}>To Job</button>
-                      )}
-                      {canEditOrDelete(q) && (
-                        <button className="btn danger sm" disabled={busy} onClick={() => del(q.id)}>{busy ? '…' : 'Delete'}</button>
-                      )}
-                    </div>
+                      {canPrint && <a className="btn ghost sm" href={`/api/quotes/${q.id}/agreement`}>Work Agreement</a>}
+                      {fullAccess && <button className="btn ghost sm" disabled={busy} onClick={() => duplicate(q.id)}>{busy ? '…' : 'Duplicate'}</button>}
+                      {canConvert && <button className="btn ghost sm" disabled={busy} onClick={() => convert(q.id)}>{busy ? '…' : 'Convert to Job'}</button>}
+                      {canEditOrDelete(q) && <button className="btn danger sm" disabled={busy} onClick={() => del(q.id)}>{busy ? '…' : 'Delete'}</button>}
+                    </RowMenu>
                   </td>
                 </tr>
               );
@@ -206,30 +201,6 @@ export default function QuotesApp({ initialQuotes, myId, fullAccess }) {
         </table>
         {list.length === 0 && <div className="empty">No quotes match your filters.</div>}
       </div>
-
-      <Modal open={!!reviewModal}>
-        {reviewModal && (
-          <>
-            <h3>Review Quote {reviewModal.quote.quote_number}</h3>
-            <p className="small-note">
-              {reviewModal.quote.client_name} — {money(reviewModal.quote.total)} — drafted by {reviewModal.quote.created_by || 'unknown'}
-            </p>
-            <div className="field">
-              <label>Note (shown to the drafter, e.g. what to fix if rejecting)</label>
-              <textarea rows={3} value={reviewModal.note} onChange={(e) => setReviewModal({ ...reviewModal, note: e.target.value })} />
-            </div>
-            <div className="modal-actions">
-              <button className="btn ghost" disabled={reviewing} onClick={() => setReviewModal(null)}>Cancel</button>
-              <button className="btn danger-solid" disabled={reviewing} onClick={() => submitReview('rejected')}>
-                {reviewing ? '…' : 'Reject'}
-              </button>
-              <button className="btn amber" disabled={reviewing} onClick={() => submitReview('approved')}>
-                {reviewing ? '…' : 'Approve'}
-              </button>
-            </div>
-          </>
-        )}
-      </Modal>
     </>
   );
 }

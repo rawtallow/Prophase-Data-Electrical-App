@@ -1,8 +1,14 @@
 import { NextResponse } from 'next/server';
 import { sql, isForeignKeyViolation } from '../../../../lib/db';
 import { getSession, CAN } from '../../../../lib/auth';
+import { serializeDates } from '../../../../lib/format';
 
 export const runtime = 'nodejs';
+
+// See app/api/purchase-orders/route.js's copy of this same comment for the
+// full explanation — a raw Date column shifts by a day once it crosses
+// NextResponse.json() on a server running outside UTC.
+const QUOTE_DATE_FIELDS = ['date', 'valid_until'];
 
 function computeTotals(lineItems, taxRate, discount) {
   const subtotal = lineItems.reduce((s, li) => s + (Number(li.qty) || 0) * (Number(li.price) || 0), 0);
@@ -18,7 +24,7 @@ export async function GET(req, { params }) {
   const quotes = await sql`select * from quotes where id = ${params.id}`;
   if (!quotes[0]) return NextResponse.json({ error: 'Not found' }, { status: 404 });
   const lineItems = await sql`select * from quote_line_items where quote_id = ${params.id} order by sort_order asc`;
-  return NextResponse.json({ ...quotes[0], lineItems });
+  return NextResponse.json({ ...serializeDates(quotes[0], QUOTE_DATE_FIELDS), lineItems });
 }
 
 export async function PUT(req, { params }) {
@@ -40,13 +46,17 @@ export async function PUT(req, { params }) {
   }
 
   const body = await req.json();
-  const { clientId, clientName, clientPhone, clientEmail, clientAddress, jobDescription, lineItems, taxRate, discount, status, notes } = body;
+  const { clientId, clientName, clientPhone, clientEmail, clientAddress, jobDescription, lineItems, taxRate, discount, status, notes, internalNotes, validUntil } = body;
   const cleanItems = (lineItems || []).filter((li) => (li.description || '').trim() !== '' || (Number(li.qty) || 0) * (Number(li.price) || 0) !== 0);
   if (cleanItems.length === 0) return NextResponse.json({ error: 'Add at least one line item' }, { status: 400 });
 
   const { subtotal, tax, total } = computeTotals(cleanItems, taxRate, discount);
 
-  let finalStatus = status;
+  // Every tab on the Quote Details page shares this one PUT (it always
+  // replaces the whole record), so a save triggered from a tab that doesn't
+  // touch status (e.g. Notes) must fall back to the existing value rather
+  // than clearing it.
+  let finalStatus = status || existing.status;
   let finalApprovalStatus = existing.approval_status;
   let finalApprovalNote = existing.approval_note;
   let finalReviewedBy = existing.reviewed_by;
@@ -67,8 +77,8 @@ export async function PUT(req, { params }) {
       client_id = ${clientId || null}, client_name = ${clientName}, client_phone = ${clientPhone || ''},
       client_email = ${clientEmail || ''}, client_address = ${clientAddress || ''}, job_description = ${jobDescription || ''},
       tax_rate = ${Number(taxRate) || 0}, discount = ${Number(discount) || 0}, subtotal = ${subtotal}, tax = ${tax}, total = ${total},
-      status = ${finalStatus}, notes = ${notes || ''},
-      approval_status = ${finalApprovalStatus}, approval_note = ${finalApprovalNote}, reviewed_by = ${finalReviewedBy}
+      status = ${finalStatus}, notes = ${notes || ''}, internal_notes = ${internalNotes || ''}, valid_until = ${validUntil || existing.valid_until},
+      approval_status = ${finalApprovalStatus}, approval_note = ${finalApprovalNote}, reviewed_by = ${finalReviewedBy}, updated_at = now()
     where id = ${params.id}
     returning *
   `;
@@ -82,7 +92,7 @@ export async function PUT(req, { params }) {
     `;
   }
 
-  return NextResponse.json(rows[0]);
+  return NextResponse.json(serializeDates(rows[0], QUOTE_DATE_FIELDS));
 }
 
 export async function DELETE(req, { params }) {

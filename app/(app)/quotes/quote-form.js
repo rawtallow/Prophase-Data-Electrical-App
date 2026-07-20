@@ -11,6 +11,7 @@ export default function QuoteForm({ existing, clients, fullAccess }) {
       ? {
           id: existing.id,
           quoteNumber: existing.quote_number,
+          clientId: existing.client_id || '',
           clientName: existing.client_name,
           clientPhone: existing.client_phone || '',
           clientEmail: existing.client_email || '',
@@ -22,7 +23,7 @@ export default function QuoteForm({ existing, clients, fullAccess }) {
           notes: existing.notes || ''
         }
       : {
-          clientName: '', clientPhone: '', clientEmail: '', clientAddress: '',
+          clientId: '', clientName: '', clientPhone: '', clientEmail: '', clientAddress: '',
           jobDescription: '', taxRate: 10, discount: 0, status: 'Draft', notes: ''
         }
   );
@@ -32,6 +33,15 @@ export default function QuoteForm({ existing, clients, fullAccess }) {
       : [{ description: '', qty: 1, price: 0 }]
   );
   const [saving, setSaving] = useState(false);
+
+  // Keeps clientId in sync with whatever name is typed/picked from the
+  // customer datalist, so quotes are actually foreign-keyed to a client
+  // (previously only client_name text was saved) — same pattern as Job Log's
+  // onClientNameChange.
+  function onClientNameChange(name) {
+    const match = clients.find((c) => c.name.toLowerCase() === name.toLowerCase());
+    setForm({ ...form, clientName: name, clientId: match ? match.id : '' });
+  }
 
   function updateItem(i, field, value) {
     const next = [...lineItems];
@@ -93,7 +103,7 @@ export default function QuoteForm({ existing, clients, fullAccess }) {
         <div className="grid-2">
           <div className="field">
             <label>Customer Name *</label>
-            <input list="client-names" value={form.clientName} onChange={(e) => setForm({ ...form, clientName: e.target.value })} />
+            <input list="client-names" value={form.clientName} onChange={(e) => onClientNameChange(e.target.value)} />
             <datalist id="client-names">{clients.map((c) => <option key={c.id} value={c.name} />)}</datalist>
           </div>
           <div className="field"><label>Phone</label><input value={form.clientPhone} onChange={(e) => setForm({ ...form, clientPhone: e.target.value })} /></div>
