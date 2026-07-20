@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { sql } from '../../../../../lib/db';
 import { getSession, CAN } from '../../../../../lib/auth';
+import { sydneyToday } from '../../../../../lib/format';
 
 export const runtime = 'nodejs';
 
@@ -20,9 +21,9 @@ export async function POST(req, { params }) {
   // always auto-approved under whoever clicked Duplicate — not the original
   // quote's creator/approval history, which doesn't carry over.
   const newRows = await sql`
-    insert into quotes (quote_number, client_id, client_name, client_phone, client_email, client_address, job_description,
+    insert into quotes (quote_number, date, client_id, client_name, client_phone, client_email, client_address, job_description,
       tax_rate, discount, subtotal, tax, total, status, notes, approval_status, created_by_id, created_by)
-    values (${quoteNumber}, ${q.client_id}, ${q.client_name}, ${q.client_phone}, ${q.client_email}, ${q.client_address},
+    values (${quoteNumber}, ${sydneyToday()}, ${q.client_id}, ${q.client_name}, ${q.client_phone}, ${q.client_email}, ${q.client_address},
       ${q.job_description}, ${q.tax_rate}, ${q.discount}, ${q.subtotal}, ${q.tax}, ${q.total}, 'Draft', ${q.notes},
       'Approved', ${session.id}, ${session.name})
     returning *

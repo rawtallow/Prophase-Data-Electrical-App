@@ -16,12 +16,12 @@ export async function POST(req) {
   if (!session || !CAN.manageClients(session.role)) {
     return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
   }
-  const { name, phone, email, address, leadSource } = await req.json();
+  const { name, phone, email, address, leadSource, company, notes } = await req.json();
   if (!name || !name.trim()) return NextResponse.json({ error: 'Name is required' }, { status: 400 });
 
   const rows = await sql`
-    insert into clients (name, phone, email, address, lead_source)
-    values (${name.trim()}, ${phone || ''}, ${email || ''}, ${address || ''}, ${leadSource || ''})
+    insert into clients (name, phone, email, address, lead_source, company, notes)
+    values (${name.trim()}, ${phone || ''}, ${email || ''}, ${address || ''}, ${leadSource || ''}, ${company || ''}, ${notes || ''})
     returning *
   `;
   return NextResponse.json(rows[0]);

@@ -36,6 +36,8 @@ export async function POST(req) {
     sql`delete from payroll_allocations`,
     sql`delete from payroll_entries`,
     sql`delete from quote_line_items`,
+    sql`delete from job_line_items`,
+    sql`delete from job_payments`,
     sql`delete from jobs`,
     sql`delete from quotes`,
     sql`delete from assets`,
@@ -84,10 +86,29 @@ export async function POST(req) {
   for (const j of data.jobs) {
     queries.push(sql`
       insert into jobs (id, job_number, quote_id, client_id, asset_id, client_name, job_description, scheduled_date, status,
-        priority, job_type, amount_invoiced, amount_paid, notes, created_date, completed_date)
+        priority, job_type, assigned_to_id, assigned_to_name, amount_invoiced, amount_paid, notes, created_date, completed_date)
       values (${j.id}, ${j.job_number}, ${j.quote_id}, ${j.client_id}, ${j.asset_id || null}, ${j.client_name}, ${j.job_description}, ${j.scheduled_date},
-        ${j.status}, ${j.priority || 'Medium'}, ${j.job_type || 'Quoted Job'}, ${j.amount_invoiced}, ${j.amount_paid}, ${j.notes}, ${j.created_date}, ${j.completed_date || null})
+        ${j.status}, ${j.priority || 'Medium'}, ${j.job_type || 'Quoted Job'}, ${j.assigned_to_id || null}, ${j.assigned_to_name || ''},
+        ${j.amount_invoiced}, ${j.amount_paid}, ${j.notes}, ${j.created_date}, ${j.completed_date || null})
     `);
+  }
+  // Optional — older backups won't have these; job_line_items/job_payments
+  // both need the jobs loop above to have run first (FK on job_id).
+  if (Array.isArray(data.jobLineItems)) {
+    for (const li of data.jobLineItems) {
+      queries.push(sql`
+        insert into job_line_items (id, job_id, description, qty, price, sort_order)
+        values (${li.id}, ${li.job_id}, ${li.description}, ${li.qty}, ${li.price}, ${li.sort_order})
+      `);
+    }
+  }
+  if (Array.isArray(data.jobPayments)) {
+    for (const p of data.jobPayments) {
+      queries.push(sql`
+        insert into job_payments (id, job_id, date, amount, method, note, created_by, created_at)
+        values (${p.id}, ${p.job_id}, ${p.date}, ${p.amount}, ${p.method || ''}, ${p.note || ''}, ${p.created_by || ''}, ${p.created_at})
+      `);
+    }
   }
   for (const pe of data.payrollEntries) {
     queries.push(sql`

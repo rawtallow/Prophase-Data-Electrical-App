@@ -8,7 +8,7 @@ import { visibleItems, isActive, NavIcon } from './nav-items';
 // used destinations plus a "Menu" button that opens a full drawer listing
 // every permitted page, grouped by section. Reads the shared nav config so
 // it stays in lockstep with the desktop nav.
-export default function MobileNav({ role }) {
+export default function MobileNav({ role, badges = {} }) {
   const pathname = usePathname();
   const items = visibleItems(role);
   const bottom = items.filter((i) => i.bottom);
@@ -44,7 +44,10 @@ export default function MobileNav({ role }) {
       <nav className="bottom-nav mobile-only">
         {bottom.map((i) => (
           <Link key={i.href} href={i.href} className={`bn-item${isActive(pathname, i.href) ? ' active' : ''}`}>
-            <NavIcon name={i.icon} />
+            <span className="bn-icon-wrap">
+              <NavIcon name={i.icon} />
+              {badges[i.href] > 0 && <span className="nav-badge">{badges[i.href]}</span>}
+            </span>
             {i.short || i.label}
           </Link>
         ))}
@@ -82,6 +85,7 @@ export default function MobileNav({ role }) {
                   <Link key={i.href} href={i.href} className={`drawer-link${isActive(pathname, i.href) ? ' active' : ''}`}>
                     <NavIcon name={i.icon} />
                     {i.label}
+                    {badges[i.href] > 0 && <span className="nav-badge">{badges[i.href]}</span>}
                   </Link>
                 ))}
               </div>

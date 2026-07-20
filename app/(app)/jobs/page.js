@@ -8,10 +8,14 @@ export default async function JobsPage() {
 
   // High-priority jobs first, then Medium, then Low, so urgent work stays
   // visible at the top of the log instead of buried by date.
-  const [jobs, clients, assets, laborRows, materialRows] = await Promise.all([
+  const [jobs, clients, assets, employees, laborRows, materialRows] = await Promise.all([
     sql(`select * from jobs order by case priority when 'High' then 0 when 'Medium' then 1 when 'Low' then 2 else 1 end, created_date desc, job_number desc`),
     sql`select id, name from clients order by name asc`,
     sql`select id, client_id, name from assets order by name asc`,
+    // Fetched server-side (not a client-side /api/employees call) since
+    // that endpoint is middleware-blocked for employee-role sessions, but
+    // everyone needs this list to see/filter the Assigned To column.
+    sql`select id, name from employees where status = 'Active' order by name asc`,
     fullAccess
       ? sql`
           select pa.job_id, sum(pa.reg_hours * pe.hourly_rate + pa.ot_hours * pe.hourly_rate * 1.5) as cost
@@ -38,6 +42,7 @@ export default async function JobsPage() {
       initialJobs={jobs}
       clients={clients}
       assets={assets}
+      employees={employees}
       laborByJob={laborByJob}
       materialsByJob={materialsByJob}
       fullAccess={fullAccess}

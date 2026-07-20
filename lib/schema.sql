@@ -4,6 +4,17 @@
 
 create extension if not exists pgcrypto;
 
+-- Prophase is a Sydney-based business, but Neon's session timezone is UTC —
+-- and (confirmed by testing) an ALTER DATABASE ... SET timezone override
+-- doesn't stick for this app's connections: the @neondatabase/serverless
+-- HTTP driver's proxy re-injects its own session timezone per request
+-- regardless of the database-level default. So the `default current_date`
+-- below is a NOT-NULL safety net only — every app insert path explicitly
+-- passes a Sydney-local date computed by lib/format.js's sydneyToday()
+-- instead of relying on this default, since left to its own devices it
+-- dates anything created between Sydney midnight and ~10am (AEST) a day
+-- early (the UTC calendar date hasn't rolled over yet).
+
 create table if not exists users (
   id uuid primary key default gen_random_uuid(),
   name text not null,
@@ -30,6 +41,12 @@ create table if not exists clients (
   lead_source text default '',
   created_at timestamptz not null default now()
 );
+
+-- Added for the client detail page's Overview/Notes tabs — the quick "+ New
+-- Client" create flow deliberately still skips these two (kept lean), they
+-- get filled in from the profile page afterward.
+alter table clients add column if not exists company text default '';
+alter table clients add column if not exists notes text default '';
 
 create table if not exists assets (
   id uuid primary key default gen_random_uuid(),
@@ -99,13 +116,50 @@ create table if not exists jobs (
   priority text not null default 'Medium',
   job_type text not null default 'Quoted Job',
   amount_invoiced numeric not null default 0,
+  -- Cached running total, kept in sync by app/api/jobs/[id]/payments — the
+  -- source of truth is the job_payments table below; this column exists so
+  -- list views don't need a join/sum on every render.
   amount_paid numeric not null default 0,
   notes text default '',
   created_date date not null default current_date,
   -- Stamped automatically when status first transitions to 'Complete' (see
   -- app/api/jobs/[id]/route.js), not user-editable. Drives the Workmanship
   -- Warranty document's completion/expiry dates.
-  completed_date date
+  completed_date date,
+  -- Who's doing the physical work — distinct from created_by-style fields
+  -- elsewhere, which track authorship; this tracks assignment. Snapshot
+  -- name alongside the FK so a deleted employee doesn't erase job history.
+  assigned_to_id uuid references employees(id) on delete set null,
+  assigned_to_name text default ''
+);
+
+-- Itemized invoice lines for a job — optional. When a job has at least one
+-- of these, they're the computed source of truth for jobs.amount_invoiced
+-- (subtotal + GST, read-only in the UI); when it has none, amount_invoiced
+-- stays a plain manually-typed number. Mirrors quote_line_items (sell-side
+-- pricing), not purchase_order_line_items (a supplier cost record).
+create table if not exists job_line_items (
+  id uuid primary key default gen_random_uuid(),
+  job_id uuid not null references jobs(id) on delete cascade,
+  description text not null default '',
+  qty numeric not null default 1,
+  price numeric not null default 0,
+  sort_order int not null default 0
+);
+
+-- Payment history — see app/api/jobs/[id]/payments. Each row is one logged
+-- payment; jobs.amount_paid is the running total these accumulate into,
+-- the same "child rows drive a cached parent total" shape already used by
+-- purchase_order_line_items.qty_received / parts.qty_on_hand.
+create table if not exists job_payments (
+  id uuid primary key default gen_random_uuid(),
+  job_id uuid not null references jobs(id) on delete cascade,
+  date date not null default current_date,
+  amount numeric not null default 0,
+  method text default '',
+  note text default '',
+  created_by text default '',
+  created_at timestamptz not null default now()
 );
 
 create table if not exists employees (
@@ -303,4 +357,80 @@ create table if not exists purchase_order_line_items (
   unit_cost numeric not null default 0,
   qty_received numeric not null default 0,
   sort_order int not null default 0
+);
+
+-- Numbers freed by a cancelled or deleted PO, available to be handed out
+-- again before minting a brand new one (see nextPoNumber() in
+-- app/api/purchase-orders/route.js and .../draft/route.js). Wholesalers
+-- require a PO number up front before they'll give a price, so "New PO"
+-- reserves one immediately rather than waiting for the form to be saved —
+-- this pool is what stops that up-front reservation from permanently
+-- burning a number if the PO never ends up getting used.
+create table if not exists po_number_pool (
+  po_number text primary key,
+  released_at timestamptz not null default now()
+);
+
+-- Belt-and-suspenders: the pool-then-counter logic in nextPoNumber() should
+-- already guarantee every po_number is unique, but this makes a bug there
+-- fail loudly (a rejected insert) instead of silently letting two live POs
+-- share the same number — which is exactly the scenario a wholesaler-facing
+-- number exists to prevent.
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'purchase_orders_po_number_unique') then
+    alter table purchase_orders add constraint purchase_orders_po_number_unique unique (po_number);
+  end if;
+end
+$$;
+
+-- A supplier's actual invoice for a delivery against a PO — logged in the
+-- same action as Receive Items (see app/api/purchase-orders/[id]/receive)
+-- since in practice the goods and the paperwork arrive together. Give the
+-- supplier the po_number; when their invoice references it, this is where
+-- it gets recorded. purchase_orders.total is what WE ordered for; this is
+-- what the supplier actually billed — kept separate since price/freight/
+-- partial-shipment differences are common and shouldn't silently overwrite
+-- the PO's own total.
+create table if not exists purchase_order_invoices (
+  id uuid primary key default gen_random_uuid(),
+  purchase_order_id uuid not null references purchase_orders(id) on delete cascade,
+  invoice_number text not null default '',
+  invoice_date date not null default current_date,
+  subtotal numeric not null default 0,
+  tax numeric not null default 0,
+  total numeric not null default 0,
+  amount_paid numeric not null default 0,
+  status text not null default 'Unpaid', -- Unpaid, Partially Paid, Paid
+  notes text default '',
+  created_by text default '',
+  created_at timestamptz not null default now()
+);
+
+-- Mirrors purchase_order_line_items but independently editable — pre-filled
+-- from the PO's own lines (description + unit_cost) when the invoice is
+-- logged, then adjustable to match what the supplier actually billed.
+-- po_line_item_id links back so the UI can flag a line where the invoiced
+-- price differs from what was ordered.
+create table if not exists purchase_order_invoice_line_items (
+  id uuid primary key default gen_random_uuid(),
+  purchase_order_invoice_id uuid not null references purchase_order_invoices(id) on delete cascade,
+  po_line_item_id uuid references purchase_order_line_items(id) on delete set null,
+  description text not null default '',
+  qty numeric not null default 0,
+  unit_cost numeric not null default 0,
+  sort_order int not null default 0
+);
+
+-- amount_paid on purchase_order_invoices is a cached running total kept in
+-- sync by this table's rows, same shape as job_payments / jobs.amount_paid.
+create table if not exists purchase_order_invoice_payments (
+  id uuid primary key default gen_random_uuid(),
+  purchase_order_invoice_id uuid not null references purchase_order_invoices(id) on delete cascade,
+  date date not null default current_date,
+  amount numeric not null default 0,
+  method text default '',
+  note text default '',
+  created_by text default '',
+  created_at timestamptz not null default now()
 );

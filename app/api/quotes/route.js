@@ -1,8 +1,15 @@
 import { NextResponse } from 'next/server';
 import { sql } from '../../../lib/db';
 import { getSession, CAN } from '../../../lib/auth';
+import { sydneyToday, serializeDates } from '../../../lib/format';
 
 export const runtime = 'nodejs';
+
+// The neon driver parses `date` columns using local-time components; once a
+// raw Date crosses NextResponse.json() (JSON.stringify -> UTC toJSON), it can
+// land on the wrong calendar day for servers running outside UTC. See
+// lib/format.js's serializeDates for the full explanation.
+const QUOTE_DATE_FIELDS = ['date'];
 
 async function nextQuoteNumber() {
   const rows = await sql`update counters set value = value + 1 where key = 'quote' returning value`;
@@ -23,7 +30,7 @@ export async function GET() {
     return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
   }
   const rows = await sql`select * from quotes order by created_at desc`;
-  return NextResponse.json(rows);
+  return NextResponse.json(rows.map((r) => serializeDates(r, QUOTE_DATE_FIELDS)));
 }
 
 export async function POST(req) {
@@ -48,9 +55,9 @@ export async function POST(req) {
   const approvalStatus = isEmployee ? 'Pending Approval' : 'Approved';
 
   const rows = await sql`
-    insert into quotes (quote_number, client_id, client_name, client_phone, client_email, client_address, job_description,
+    insert into quotes (quote_number, date, client_id, client_name, client_phone, client_email, client_address, job_description,
       tax_rate, discount, subtotal, tax, total, status, notes, approval_status, created_by_id, created_by)
-    values (${quoteNumber}, ${clientId || null}, ${clientName.trim()}, ${clientPhone || ''}, ${clientEmail || ''}, ${clientAddress || ''},
+    values (${quoteNumber}, ${sydneyToday()}, ${clientId || null}, ${clientName.trim()}, ${clientPhone || ''}, ${clientEmail || ''}, ${clientAddress || ''},
       ${jobDescription || ''}, ${Number(taxRate) || 0}, ${Number(discount) || 0}, ${subtotal}, ${tax}, ${total}, ${finalStatus}, ${notes || ''},
       ${approvalStatus}, ${session.id}, ${session.name})
     returning *
@@ -65,5 +72,5 @@ export async function POST(req) {
     `;
   }
 
-  return NextResponse.json(quote);
+  return NextResponse.json(serializeDates(quote, QUOTE_DATE_FIELDS));
 }

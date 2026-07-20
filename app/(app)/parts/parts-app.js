@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { toast, confirmDialog } from '../ui-feedback';
 import Modal from '../modal';
 import { money } from '../../../lib/format';
@@ -10,11 +11,39 @@ function isLow(p) {
 }
 
 export default function PartsApp({ initialParts, canManage }) {
+  const router = useRouter();
   const [parts, setParts] = useState(initialParts);
   const [search, setSearch] = useState('');
   const [modal, setModal] = useState(null);
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState(null);
+  const [reordering, setReordering] = useState(null);
+
+  // Reserves a real PO number immediately (same as the Purchase Orders
+  // page's "+ New PO") and pre-populates one real, persisted line item for
+  // this part, so the reorder isn't lost if the user navigates away before
+  // saving — then drops straight into editing that new PO.
+  async function reorder(p) {
+    setReordering(p.id);
+    try {
+      const res = await fetch('/api/purchase-orders/draft', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ partId: p.id, qty: Number(p.reorder_threshold) || 1 })
+      });
+      if (res.ok) {
+        const po = await res.json();
+        router.push(`/purchase-orders/${po.id}/edit`);
+      } else {
+        const d = await res.json().catch(() => ({}));
+        toast.error(d.error || 'Could not start a purchase order');
+        setReordering(null);
+      }
+    } catch {
+      toast.error('Could not start a purchase order');
+      setReordering(null);
+    }
+  }
 
   async function refresh() {
     try {
@@ -135,6 +164,11 @@ export default function PartsApp({ initialParts, canManage }) {
                     <div className="row-actions">
                       <button className="btn ghost sm" disabled={busy} onClick={() => adjust(p.id, -1)}>-1</button>
                       <button className="btn ghost sm" disabled={busy} onClick={() => adjust(p.id, 1)}>+1</button>
+                      {low && (
+                        <button className="btn ghost sm" disabled={reordering === p.id} onClick={() => reorder(p)}>
+                          {reordering === p.id ? 'Starting…' : 'Reorder'}
+                        </button>
+                      )}
                       {canManage && <button className="btn ghost sm" disabled={busy} onClick={() => openEdit(p)}>Edit</button>}
                       {canManage && <button className="btn danger sm" disabled={busy} onClick={() => del(p.id)}>{busy ? '…' : 'Delete'}</button>}
                     </div>

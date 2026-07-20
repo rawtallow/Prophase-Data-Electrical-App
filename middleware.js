@@ -53,6 +53,12 @@ function isJobWarranty(pathname) {
 function isPOPrint(pathname) {
   return /^\/purchase-orders\/[^/]+\/print(\/.*)?$/.test(pathname);
 }
+// Same reasoning as isPOPrint: the invoice is a customer-facing financial
+// document, so it stays blocked for employees even though /jobs and
+// /api/jobs themselves are open to all roles.
+function isJobInvoice(pathname) {
+  return /^\/jobs\/[^/]+\/invoice(\/.*)?$/.test(pathname);
+}
 
 export async function middleware(req) {
   const { pathname } = req.nextUrl;
@@ -83,6 +89,10 @@ export async function middleware(req) {
 
   if (isPOPrint(pathname) && session.role === 'employee') {
     return NextResponse.redirect(new URL('/purchase-orders?denied=1', req.url));
+  }
+
+  if (isJobInvoice(pathname) && session.role === 'employee') {
+    return NextResponse.redirect(new URL('/jobs?denied=1', req.url));
   }
 
   if ((isQuoteAgreement(pathname) || isJobWarranty(pathname)) && session.role === 'employee') {

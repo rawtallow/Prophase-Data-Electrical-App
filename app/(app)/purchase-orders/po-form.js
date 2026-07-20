@@ -110,6 +110,18 @@ export default function PoForm({ existing, suppliers, parts, jobs, fullAccess })
     }
   }
 
+  // Backing out of a PO that was just created (to reserve its number) and
+  // never actually filled in should give the number back, not leave a
+  // permanent empty Draft sitting in the list — see the DELETE handler's
+  // pool release. An already-populated PO just navigates away unchanged.
+  async function cancel() {
+    const isPristineStub = existing && !existing.supplier_name && existing.lineItems.length === 0;
+    if (isPristineStub) {
+      await fetch(`/api/purchase-orders/${existing.id}`, { method: 'DELETE' }).catch(() => {});
+    }
+    router.push('/purchase-orders');
+  }
+
   // A manager/admin can still open an employee's not-yet-approved PO
   // directly via its edit link — Sent/Cancelled stay off the table until
   // it's actually approved, matching the server-side rule. Received /
@@ -216,7 +228,7 @@ export default function PoForm({ existing, suppliers, parts, jobs, fullAccess })
         </div>
 
         <div className="footer-actions">
-          <button className="btn ghost" onClick={() => router.push('/purchase-orders')}>Cancel</button>
+          <button className="btn ghost" onClick={cancel}>Cancel</button>
           <button className="btn amber" disabled={saving} onClick={save}>{saving ? 'Saving…' : 'Save Purchase Order'}</button>
         </div>
       </div>

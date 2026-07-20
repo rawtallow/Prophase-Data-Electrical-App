@@ -3,6 +3,7 @@ import { put } from '@vercel/blob';
 import { sql } from '../../../lib/db';
 import { getSession, CAN } from '../../../lib/auth';
 import { COMPLIANCE_TYPES } from '../../../lib/compliance-types';
+import { sydneyToday } from '../../../lib/format';
 
 export const runtime = 'nodejs';
 
@@ -68,7 +69,7 @@ export async function POST(req) {
     insert into compliance_records
       (type, job_id, client_id, employee_id, record_date, reference_number, result, retest_due, description, file_url, notes, uploaded_by)
     values
-      (${type}, ${jobId}, ${clientId}, ${employeeId}, ${recordDate || new Date().toISOString().slice(0, 10)},
+      (${type}, ${jobId}, ${clientId}, ${employeeId}, ${recordDate || sydneyToday()},
        ${referenceNumber}, ${result}, ${retestDue}, ${description}, ${fileUrl}, ${notes}, ${session.name})
     returning *
   `;

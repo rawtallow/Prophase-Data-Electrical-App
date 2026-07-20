@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { sql } from '../../../../../lib/db';
 import { getSession, CAN } from '../../../../../lib/auth';
 import { advanceDate } from '../../../../../lib/maintenance-frequency';
-import { toDateInputValue, serializeDates } from '../../../../../lib/format';
+import { toDateInputValue, sydneyToday, serializeDates } from '../../../../../lib/format';
 
 export const runtime = 'nodejs';
 
@@ -33,10 +33,10 @@ export async function POST(req, { params }) {
   const jobDescription = contract.title + (contract.description ? ' — ' + contract.description : '');
 
   const jobRows = await sql`
-    insert into jobs (job_number, client_id, client_name, job_description, scheduled_date, status, priority, job_type, amount_invoiced, amount_paid, notes)
+    insert into jobs (job_number, client_id, client_name, job_description, scheduled_date, status, priority, job_type, amount_invoiced, amount_paid, notes, created_date)
     values (${jobNumber}, ${contract.client_id}, ${contract.client_name}, ${jobDescription},
       ${dueDate}, 'Scheduled', 'Medium', 'Scheduled / Preventative Maintenance', ${contract.amount}, 0,
-      ${'Generated from maintenance contract: ' + contract.title})
+      ${'Generated from maintenance contract: ' + contract.title}, ${sydneyToday()})
     returning *
   `;
 

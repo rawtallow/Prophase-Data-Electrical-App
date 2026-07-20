@@ -17,6 +17,16 @@ export default async function PrintQuotePage({ params }) {
   ]);
   const q = quotes[0];
   if (!q) notFound();
+
+  // Standard trade-quote practice: pricing is only held for a limited
+  // window, so a supplier cost swing months later doesn't leave the
+  // business stuck honouring a stale number. Computed from the quote's own
+  // date rather than a stored column — no schema change needed for a fixed,
+  // business-wide policy.
+  const VALID_DAYS = 30;
+  const validUntil = new Date(q.date);
+  validUntil.setDate(validUntil.getDate() + VALID_DAYS);
+
   if (q.approval_status !== 'Approved') {
     return (
       <div style={{ maxWidth: 480, margin: '60px auto', textAlign: 'center' }}>
@@ -41,6 +51,7 @@ export default async function PrintQuotePage({ params }) {
         <div className="print-meta">
           <div className="qnum">Quote {q.quote_number}</div>
           <div>Date: {dstr(q.date)}</div>
+          <div>Valid Until: {dstr(validUntil)}</div>
           <div>Status: {q.status}</div>
         </div>
       </div>

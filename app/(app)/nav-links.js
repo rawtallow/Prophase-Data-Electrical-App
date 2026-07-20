@@ -8,7 +8,7 @@ import { visibleItems, isActive, NavIcon } from './nav-items';
 // folded into a "More" dropdown. Hidden below 820px (the mobile bottom bar +
 // drawer take over — see mobile-nav.js). Reads the shared nav config so it
 // can't drift from the mobile nav.
-export default function NavLinks({ role }) {
+export default function NavLinks({ role, badges = {} }) {
   const pathname = usePathname();
   const items = visibleItems(role);
   const primary = items.filter((i) => i.desktopPrimary);
@@ -52,6 +52,7 @@ export default function NavLinks({ role }) {
       {primary.map((i) => (
         <Link key={i.href} href={i.href} className={isActive(pathname, i.href) ? 'active' : ''}>
           <NavIcon name={i.icon} />{i.label}
+          {badges[i.href] > 0 && <span className="nav-badge">{badges[i.href]}</span>}
         </Link>
       ))}
       {more.length > 0 && (

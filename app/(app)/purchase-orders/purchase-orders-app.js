@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { toast, confirmDialog } from '../ui-feedback';
 import Modal from '../modal';
 import { money, slug, toDateInputValue as dstr } from '../../../lib/format';
@@ -9,15 +10,39 @@ const APPROVAL_STATUSES = ['Pending Approval', 'Approved', 'Rejected'];
 const STATUSES = ['Draft', 'Sent', 'Partially Received', 'Received', 'Cancelled'];
 
 export default function PurchaseOrdersApp({ initialOrders, myId, fullAccess }) {
+  const router = useRouter();
   const [orders, setOrders] = useState(initialOrders);
   const [statusFilter, setStatusFilter] = useState('');
   const [approvalFilter, setApprovalFilter] = useState('');
   const [search, setSearch] = useState('');
   const [busyId, setBusyId] = useState(null);
+  const [creating, setCreating] = useState(false);
   const [reviewModal, setReviewModal] = useState(null); // { po, note }
   const [reviewing, setReviewing] = useState(false);
   const [receiveModal, setReceiveModal] = useState(null); // { po, lines: [{ id, description, qty, qty_received, qtyNow }] }
   const [receiving, setReceiving] = useState(false);
+
+  // Wholesalers require a PO number before they'll quote a price, so this
+  // reserves a real, permanent number immediately (see the draft route's
+  // nextPoNumber()) rather than waiting for the form to be saved — then
+  // drops straight into editing that new, mostly-blank PO.
+  async function createNew() {
+    setCreating(true);
+    try {
+      const res = await fetch('/api/purchase-orders/draft', { method: 'POST' });
+      if (res.ok) {
+        const po = await res.json();
+        router.push(`/purchase-orders/${po.id}/edit`);
+      } else {
+        const d = await res.json().catch(() => ({}));
+        toast.error(d.error || 'Could not start a new purchase order');
+        setCreating(false);
+      }
+    } catch {
+      toast.error('Could not start a new purchase order');
+      setCreating(false);
+    }
+  }
 
   async function refresh() {
     try {
@@ -150,7 +175,7 @@ export default function PurchaseOrdersApp({ initialOrders, myId, fullAccess }) {
             {STATUSES.map((s) => <option key={s}>{s}</option>)}
           </select>
           <input placeholder="Search supplier or #" value={search} onChange={(e) => setSearch(e.target.value)} />
-          <a className="btn amber sm" href="/purchase-orders/new">+ New PO</a>
+          <button className="btn amber sm" disabled={creating} onClick={createNew}>{creating ? 'Creating…' : '+ New PO'}</button>
         </div>
       </div>
       <div className="panel card-table">
