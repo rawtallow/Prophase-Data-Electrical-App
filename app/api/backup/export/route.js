@@ -8,7 +8,7 @@ export async function GET() {
   const session = await getSession();
   if (!session || !CAN.backup(session.role)) return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
 
-  const [clients, assets, quotes, quoteLineItems, jobs, jobLineItems, jobPayments, employees, payrollEntries, payrollAllocations, ownerDraws, parts, counters, receipts, complianceRecords, businessSettings, maintenanceContracts, suppliers, purchaseOrders, purchaseOrderLineItems, purchaseOrderInvoices, purchaseOrderInvoiceLineItems, purchaseOrderInvoicePayments] = await Promise.all([
+  const [clients, assets, quotes, quoteLineItems, jobs, jobLineItems, jobPayments, jobAssignees, jobDocuments, jobActivity, employees, payrollEntries, payrollAllocations, ownerDraws, parts, counters, receipts, complianceRecords, businessSettings, maintenanceContracts, suppliers, purchaseOrders, purchaseOrderLineItems, purchaseOrderInvoices, purchaseOrderInvoiceLineItems, purchaseOrderInvoicePayments] = await Promise.all([
     sql`select * from clients`,
     sql`select * from assets`,
     sql`select * from quotes`,
@@ -16,6 +16,9 @@ export async function GET() {
     sql`select * from jobs`,
     sql`select * from job_line_items`,
     sql`select * from job_payments`,
+    sql`select * from job_assignees`,
+    sql`select * from job_documents`,
+    sql`select * from job_activity`,
     sql`select * from employees`,
     sql`select * from payroll_entries`,
     sql`select * from payroll_allocations`,
@@ -36,7 +39,7 @@ export async function GET() {
 
   const dump = {
     exportedAt: new Date().toISOString(),
-    clients, assets, quotes, quoteLineItems, jobs, jobLineItems, jobPayments, employees, payrollEntries, payrollAllocations, ownerDraws, parts, counters, receipts, complianceRecords, businessSettings, maintenanceContracts, suppliers, purchaseOrders, purchaseOrderLineItems, purchaseOrderInvoices, purchaseOrderInvoiceLineItems, purchaseOrderInvoicePayments
+    clients, assets, quotes, quoteLineItems, jobs, jobLineItems, jobPayments, jobAssignees, jobDocuments, jobActivity, employees, payrollEntries, payrollAllocations, ownerDraws, parts, counters, receipts, complianceRecords, businessSettings, maintenanceContracts, suppliers, purchaseOrders, purchaseOrderLineItems, purchaseOrderInvoices, purchaseOrderInvoiceLineItems, purchaseOrderInvoicePayments
   };
 
   return new NextResponse(JSON.stringify(dump, null, 2), {

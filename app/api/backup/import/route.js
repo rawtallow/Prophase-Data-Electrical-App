@@ -43,6 +43,9 @@ export async function POST(req) {
     sql`delete from quote_line_items`,
     sql`delete from job_line_items`,
     sql`delete from job_payments`,
+    sql`delete from job_assignees`,
+    sql`delete from job_documents`,
+    sql`delete from job_activity`,
     sql`delete from jobs`,
     sql`delete from quotes`,
     sql`delete from assets`,
@@ -90,15 +93,16 @@ export async function POST(req) {
   }
   for (const j of data.jobs) {
     queries.push(sql`
-      insert into jobs (id, job_number, quote_id, client_id, asset_id, client_name, job_description, scheduled_date, status,
-        priority, job_type, assigned_to_id, assigned_to_name, amount_invoiced, amount_paid, notes, created_date, completed_date)
-      values (${j.id}, ${j.job_number}, ${j.quote_id}, ${j.client_id}, ${j.asset_id || null}, ${j.client_name}, ${j.job_description}, ${j.scheduled_date},
-        ${j.status}, ${j.priority || 'Medium'}, ${j.job_type || 'Quoted Job'}, ${j.assigned_to_id || null}, ${j.assigned_to_name || ''},
-        ${j.amount_invoiced}, ${j.amount_paid}, ${j.notes}, ${j.created_date}, ${j.completed_date || null})
+      insert into jobs (id, job_number, quote_id, client_id, asset_id, client_name, job_title, job_description, site_address,
+        scheduled_date, start_date, estimated_hours, status, priority, job_type, assigned_to_id, assigned_to_name,
+        amount_invoiced, amount_paid, notes, customer_notes, created_date, updated_at, completed_date)
+      values (${j.id}, ${j.job_number}, ${j.quote_id}, ${j.client_id}, ${j.asset_id || null}, ${j.client_name}, ${j.job_title || ''}, ${j.job_description}, ${j.site_address || ''},
+        ${j.scheduled_date}, ${j.start_date || null}, ${j.estimated_hours || null}, ${j.status}, ${j.priority || 'Medium'}, ${j.job_type || 'Quoted Job'}, ${j.assigned_to_id || null}, ${j.assigned_to_name || ''},
+        ${j.amount_invoiced}, ${j.amount_paid}, ${j.notes}, ${j.customer_notes || ''}, ${j.created_date}, ${j.updated_at || null}, ${j.completed_date || null})
     `);
   }
-  // Optional — older backups won't have these; job_line_items/job_payments
-  // both need the jobs loop above to have run first (FK on job_id).
+  // Optional — older backups won't have these; all four need the jobs loop
+  // above to have run first (FK on job_id).
   if (Array.isArray(data.jobLineItems)) {
     for (const li of data.jobLineItems) {
       queries.push(sql`
@@ -112,6 +116,30 @@ export async function POST(req) {
       queries.push(sql`
         insert into job_payments (id, job_id, date, amount, method, note, created_by, created_at)
         values (${p.id}, ${p.job_id}, ${p.date}, ${p.amount}, ${p.method || ''}, ${p.note || ''}, ${p.created_by || ''}, ${p.created_at})
+      `);
+    }
+  }
+  if (Array.isArray(data.jobAssignees)) {
+    for (const a of data.jobAssignees) {
+      queries.push(sql`
+        insert into job_assignees (id, job_id, employee_id, employee_name)
+        values (${a.id}, ${a.job_id}, ${a.employee_id}, ${a.employee_name || ''})
+      `);
+    }
+  }
+  if (Array.isArray(data.jobDocuments)) {
+    for (const d of data.jobDocuments) {
+      queries.push(sql`
+        insert into job_documents (id, job_id, label, category, file_url, uploaded_by, created_at)
+        values (${d.id}, ${d.job_id}, ${d.label || ''}, ${d.category || 'Photo'}, ${d.file_url}, ${d.uploaded_by || ''}, ${d.created_at})
+      `);
+    }
+  }
+  if (Array.isArray(data.jobActivity)) {
+    for (const a of data.jobActivity) {
+      queries.push(sql`
+        insert into job_activity (id, job_id, type, message, created_by, created_at)
+        values (${a.id}, ${a.job_id}, ${a.type || 'note'}, ${a.message || ''}, ${a.created_by || ''}, ${a.created_at})
       `);
     }
   }

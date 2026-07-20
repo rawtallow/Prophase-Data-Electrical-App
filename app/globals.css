@@ -578,12 +578,14 @@ select {
 }
 /* neutral */
 .badge.draft, .badge.quoted, .badge.inactive, .badge.employee, .badge.low,
-.badge.quotedjob, .badge.testtag, .badge.na, .badge.other {
+.badge.quotedjob, .badge.testtag, .badge.na, .badge.other,
+.badge.photo, .badge.document, .badge.permit {
   background: var(--b-neutral-bg); color: var(--b-neutral-fg); border-color: rgba(87, 83, 78, 0.12);
 }
 /* warn / in-flight */
 .badge.sent, .badge.inprogress, .badge.medium, .badge.rcdsafetyswitchtest,
-.badge.pendingapproval, .badge.paused, .badge.partiallypaid {
+.badge.pendingapproval, .badge.paused, .badge.partiallypaid,
+.badge.onhold, .badge.awaitingparts {
   background: var(--b-warn-bg); color: var(--b-warn-fg); border-color: rgba(146, 64, 14, 0.14);
 }
 /* good */
@@ -594,7 +596,7 @@ select {
 }
 /* bad */
 .badge.declined, .badge.lowstock, .badge.high, .badge.noncompliant,
-.badge.rejected, .badge.cancelled, .badge.unpaid {
+.badge.rejected, .badge.cancelled, .badge.unpaid, .badge.urgent {
   background: var(--b-bad-bg); color: var(--b-bad-fg); border-color: rgba(185, 28, 28, 0.14);
 }
 /* info */

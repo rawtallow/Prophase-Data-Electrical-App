@@ -443,3 +443,52 @@ create table if not exists purchase_order_invoice_payments (
   created_by text default '',
   created_at timestamptz not null default now()
 );
+
+-- Job Details redesign additions.
+alter table jobs add column if not exists job_title text default '';
+alter table jobs add column if not exists site_address text default '';
+alter table jobs add column if not exists start_date date;
+alter table jobs add column if not exists estimated_hours numeric;
+-- Customer-facing notes, separate from the existing `notes` column which is
+-- now treated as internal-only now that the Job Details page distinguishes
+-- the two audiences explicitly.
+alter table jobs add column if not exists customer_notes text default '';
+alter table jobs add column if not exists updated_at timestamptz;
+
+-- True multi-technician assignment. jobs.assigned_to_id/assigned_to_name
+-- stay in place as a cheap "first assignee" cache for the handful of older
+-- call sites that just want a display string (e.g. Client Details' Jobs
+-- tab), kept in sync by app/api/jobs whenever this table changes — this
+-- table is the actual source of truth for who's assigned.
+create table if not exists job_assignees (
+  id uuid primary key default gen_random_uuid(),
+  job_id uuid not null references jobs(id) on delete cascade,
+  employee_id uuid not null references employees(id) on delete cascade,
+  employee_name text not null default ''
+);
+
+-- Photos, documents, and permits attached to a job. Mirrors compliance_
+-- records' file_url/@vercel-blob pattern, but as its own table since a job
+-- can carry many files (compliance_records is one file per record).
+create table if not exists job_documents (
+  id uuid primary key default gen_random_uuid(),
+  job_id uuid not null references jobs(id) on delete cascade,
+  label text not null default '',
+  category text not null default 'Photo',
+  file_url text not null,
+  uploaded_by text not null default '',
+  created_at timestamptz not null default now()
+);
+
+-- Combined activity feed for the Job Details page's History tab — system-
+-- generated rows (status/priority changes, stamped automatically by
+-- app/api/jobs/[id]) interleaved with manually-added progress-update notes,
+-- ordered by created_at. type is 'status_change' | 'priority_change' | 'note'.
+create table if not exists job_activity (
+  id uuid primary key default gen_random_uuid(),
+  job_id uuid not null references jobs(id) on delete cascade,
+  type text not null default 'note',
+  message text not null default '',
+  created_by text not null default '',
+  created_at timestamptz not null default now()
+);

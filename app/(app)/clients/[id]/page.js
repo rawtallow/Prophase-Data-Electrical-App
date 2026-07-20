@@ -16,7 +16,14 @@ export default async function ClientDetailPage({ params }) {
   const [assets, quotes, jobs, compliance, contracts, assetJobs] = await Promise.all([
     sql`select * from assets where client_id = ${params.id} order by name asc`,
     sql`select * from quotes where client_id = ${params.id} order by date desc`,
-    sql`select * from jobs where client_id = ${params.id} order by created_date desc`,
+    sql`
+      select j.*, coalesce(string_agg(distinct ja.employee_name, ', ' order by ja.employee_name), '') as assigned_names
+      from jobs j
+      left join job_assignees ja on ja.job_id = j.id
+      where j.client_id = ${params.id}
+      group by j.id
+      order by j.created_date desc
+    `,
     sql`select * from compliance_records where client_id = ${params.id} order by record_date desc`,
     showContracts
       ? sql`select * from maintenance_contracts where client_id = ${params.id} order by next_due_date asc`

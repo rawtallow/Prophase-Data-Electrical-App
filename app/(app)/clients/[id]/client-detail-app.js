@@ -391,10 +391,10 @@ export default function ClientDetailApp({
                 {jobs.map((j) => {
                   const balance = Number(j.amount_invoiced) - Number(j.amount_paid);
                   return (
-                    <tr key={j.id}>
-                      <td data-label="Job #">{j.job_number}</td>
+                    <tr key={j.id} onClick={() => router.push(`/jobs/${j.id}`)} style={{ cursor: 'pointer' }}>
+                      <td data-label="Job #" style={{ color: 'var(--amber-dark)', fontWeight: 650 }}>{j.job_number}</td>
                       <td data-label="Type"><span className={`badge ${slug(j.job_type)}`}>{j.job_type}</span></td>
-                      <td data-label="Assigned">{j.assigned_to_name || '—'}</td>
+                      <td data-label="Assigned">{j.assigned_names || '—'}</td>
                       <td data-label="Scheduled">{fmtDate(j.scheduled_date)}</td>
                       <td data-label="Status"><span className={`badge ${slug(j.status)}`}>{j.status}</span></td>
                       {fullAccess && (
@@ -403,7 +403,7 @@ export default function ClientDetailApp({
                           <td className="num" data-label="Balance" style={{ fontWeight: 700, color: balance > 0 ? 'var(--red)' : 'var(--green)' }}>{money(balance)}</td>
                         </>
                       )}
-                      <td className="cell-actions" data-label="">
+                      <td className="cell-actions" data-label="" onClick={(e) => e.stopPropagation()}>
                         {fullAccess && Number(j.amount_invoiced) > 0 && (
                           <a className="btn ghost sm" href={`/jobs/${j.id}/invoice`} target="_blank" rel="noreferrer">Invoice</a>
                         )}

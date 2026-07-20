@@ -9,7 +9,7 @@ export const runtime = 'nodejs';
 // raw Date crosses NextResponse.json() (JSON.stringify -> UTC toJSON), it can
 // land on the wrong calendar day for servers running outside UTC. See
 // lib/format.js's serializeDates for the full explanation.
-const JOB_DATE_FIELDS = ['scheduled_date', 'created_date', 'completed_date'];
+const JOB_DATE_FIELDS = ['scheduled_date', 'created_date', 'completed_date', 'start_date'];
 
 async function nextJobNumber() {
   const rows = await sql`update counters set value = value + 1 where key = 'job' returning value`;
@@ -37,10 +37,21 @@ async function insertLineItems(jobId, cleanItems) {
     `;
   }
 }
-async function resolveAssignee(assignedToId) {
-  if (!assignedToId) return { id: null, name: '' };
-  const rows = await sql`select id, name from employees where id = ${assignedToId}`;
-  return rows[0] ? { id: rows[0].id, name: rows[0].name } : { id: null, name: '' };
+// Resolves a list of employee ids to {id, name} rows, deduped and dropping
+// anything that doesn't exist. The first entry (if any) is also cached onto
+// jobs.assigned_to_id/assigned_to_name for the couple of older call sites
+// that just want a single display string — job_assignees is the real
+// source of truth for the full list.
+async function resolveAssignees(assigneeIds) {
+  const ids = [...new Set((assigneeIds || []).filter(Boolean))];
+  if (ids.length === 0) return [];
+  const rows = await sql`select id, name from employees where id = any(${ids})`;
+  return rows;
+}
+async function insertAssignees(jobId, assignees) {
+  for (const a of assignees) {
+    await sql`insert into job_assignees (job_id, employee_id, employee_name) values (${jobId}, ${a.id}, ${a.name})`;
+  }
 }
 
 // Sorts High-priority jobs to the top of the list, then Medium, then Low,
@@ -50,7 +61,13 @@ const PRIORITY_ORDER = `case priority when 'High' then 0 when 'Medium' then 1 wh
 export async function GET() {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const rows = await sql(`select * from jobs order by ${PRIORITY_ORDER}, created_date desc, job_number desc`);
+  const rows = await sql(`
+    select j.*, coalesce(string_agg(distinct ja.employee_name, ', ' order by ja.employee_name), '') as assigned_names
+    from jobs j
+    left join job_assignees ja on ja.job_id = j.id
+    group by j.id
+    order by ${PRIORITY_ORDER}, j.created_date desc, j.job_number desc
+  `);
   return NextResponse.json(rows.map((r) => serializeDates(r, JOB_DATE_FIELDS)));
 }
 
@@ -59,23 +76,36 @@ export async function POST(req) {
   if (!session || !CAN.manageJobs(session.role)) {
     return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
   }
-  const { clientId, assetId, clientName, jobDescription, scheduledDate, status, priority, jobType, amountInvoiced, amountPaid, notes, quoteId, assignedToId, lineItems } = await req.json();
+  const {
+    clientId, assetId, clientName, jobTitle, jobDescription, siteAddress, scheduledDate, startDate,
+    estimatedHours, status, priority, jobType, amountInvoiced, amountPaid, notes, customerNotes,
+    quoteId, assigneeIds, lineItems
+  } = await req.json();
   if (!clientName || !clientName.trim()) {
     return NextResponse.json({ error: 'Client is required' }, { status: 400 });
   }
   const jobNumber = await nextJobNumber();
   const initialStatus = status || 'Quoted';
-  const assignee = await resolveAssignee(assignedToId);
+  const assignees = await resolveAssignees(assigneeIds);
+  const primary = assignees[0] || { id: null, name: '' };
   const cleanItems = cleanLineItems(lineItems);
   const finalAmountInvoiced = cleanItems.length > 0 ? lineItemsTotal(cleanItems) : Number(amountInvoiced) || 0;
   const rows = await sql`
-    insert into jobs (job_number, quote_id, client_id, asset_id, client_name, job_description, scheduled_date, status, priority, job_type, amount_invoiced, amount_paid, notes, created_date, completed_date, assigned_to_id, assigned_to_name)
-    values (${jobNumber}, ${quoteId || null}, ${clientId || null}, ${assetId || null}, ${clientName.trim()}, ${jobDescription || ''}, ${scheduledDate || null},
-      ${initialStatus}, ${priority || 'Medium'}, ${jobType || 'Quoted Job'}, ${finalAmountInvoiced}, ${Number(amountPaid) || 0}, ${notes || ''},
-      ${sydneyToday()}, ${initialStatus === 'Complete' ? sydneyToday() : null}, ${assignee.id}, ${assignee.name})
+    insert into jobs (
+      job_number, quote_id, client_id, asset_id, client_name, job_title, job_description, site_address,
+      scheduled_date, start_date, estimated_hours, status, priority, job_type, amount_invoiced, amount_paid,
+      notes, customer_notes, created_date, updated_at, completed_date, assigned_to_id, assigned_to_name
+    )
+    values (
+      ${jobNumber}, ${quoteId || null}, ${clientId || null}, ${assetId || null}, ${clientName.trim()}, ${jobTitle || ''}, ${jobDescription || ''}, ${siteAddress || ''},
+      ${scheduledDate || null}, ${startDate || null}, ${estimatedHours || null}, ${initialStatus}, ${priority || 'Medium'}, ${jobType || 'Quoted Job'}, ${finalAmountInvoiced}, ${Number(amountPaid) || 0},
+      ${notes || ''}, ${customerNotes || ''}, ${sydneyToday()}, now(), ${initialStatus === 'Complete' ? sydneyToday() : null}, ${primary.id}, ${primary.name}
+    )
     returning *
   `;
   const job = rows[0];
   if (cleanItems.length > 0) await insertLineItems(job.id, cleanItems);
+  if (assignees.length > 0) await insertAssignees(job.id, assignees);
+  await sql`insert into job_activity (job_id, type, message, created_by) values (${job.id}, 'note', 'Job created', ${session.name})`;
   return NextResponse.json(serializeDates(job, JOB_DATE_FIELDS));
 }
