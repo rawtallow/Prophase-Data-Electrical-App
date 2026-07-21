@@ -44,8 +44,8 @@ export async function POST(req) {
   const approvalStatus = isEmployee ? 'Pending Approval' : 'Approved';
 
   const rows = await sql`
-    insert into purchase_orders (po_number, date, supplier_name, status, approval_status, created_by_id, created_by)
-    values (${poNumber}, ${sydneyToday()}, '', ${status}, ${approvalStatus}, ${session.id}, ${session.name})
+    insert into purchase_orders (po_number, date, supplier_name, status, approval_status, created_by_id, created_by, updated_at)
+    values (${poNumber}, ${sydneyToday()}, '', ${status}, ${approvalStatus}, ${session.id}, ${session.name}, now())
     returning *
   `;
   const po = rows[0];
@@ -60,6 +60,7 @@ export async function POST(req) {
       `;
     }
   }
+  await sql`insert into po_activity (purchase_order_id, type, message, created_by) values (${po.id}, 'note', 'Purchase order created', ${session.name})`;
 
   return NextResponse.json(serializeDates(po, PO_DATE_FIELDS));
 }

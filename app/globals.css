@@ -579,19 +579,19 @@ select {
 /* neutral */
 .badge.draft, .badge.quoted, .badge.inactive, .badge.employee, .badge.low,
 .badge.quotedjob, .badge.testtag, .badge.na, .badge.other,
-.badge.photo, .badge.document, .badge.permit {
+.badge.photo, .badge.document, .badge.permit, .badge.notinvoiced {
   background: var(--b-neutral-bg); color: var(--b-neutral-fg); border-color: rgba(87, 83, 78, 0.12);
 }
 /* warn / in-flight */
 .badge.sent, .badge.inprogress, .badge.medium, .badge.rcdsafetyswitchtest,
 .badge.pendingapproval, .badge.paused, .badge.partiallypaid,
-.badge.onhold, .badge.awaitingparts {
+.badge.onhold, .badge.awaitingparts, .badge.invoiced {
   background: var(--b-warn-bg); color: var(--b-warn-fg); border-color: rgba(146, 64, 14, 0.14);
 }
 /* good */
 .badge.accepted, .badge.complete, .badge.activestatus, .badge.instock,
 .badge.scheduledpreventativemaintenance, .badge.compliant, .badge.approved,
-.badge.referral, .badge.wordofmouth, .badge.active, .badge.paid {
+.badge.referral, .badge.wordofmouth, .badge.active, .badge.paid, .badge.completed {
   background: var(--b-good-bg); color: var(--b-good-fg); border-color: rgba(21, 128, 61, 0.14);
 }
 /* bad */
@@ -601,7 +601,7 @@ select {
 }
 /* info */
 .badge.scheduled, .badge.manager, .badge.callout, .badge.certificateofcompliance,
-.badge.googlesearch, .badge.websiteenquiry {
+.badge.googlesearch, .badge.websiteenquiry, .badge.ordered, .badge.deliverydocket {
   background: var(--b-info-bg); color: var(--b-info-fg); border-color: rgba(29, 78, 216, 0.14);
 }
 /* brand */

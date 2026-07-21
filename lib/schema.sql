@@ -492,3 +492,112 @@ create table if not exists job_activity (
   created_by text not null default '',
   created_at timestamptz not null default now()
 );
+
+-- Purchase Order System Restructure.
+alter table purchase_orders add column if not exists client_id uuid references clients(id) on delete set null;
+alter table purchase_orders add column if not exists client_name text default '';
+alter table purchase_orders add column if not exists asset_id uuid references assets(id) on delete set null;
+alter table purchase_orders add column if not exists quote_id uuid references quotes(id);
+alter table purchase_orders add column if not exists assigned_to_id uuid references employees(id) on delete set null;
+alter table purchase_orders add column if not exists assigned_to_name text default '';
+alter table purchase_orders add column if not exists delivery_method text default '';
+alter table purchase_orders add column if not exists delivery_address text default '';
+alter table purchase_orders add column if not exists expected_delivery_date date;
+alter table purchase_orders add column if not exists delivery_notes text default '';
+alter table purchase_orders add column if not exists updated_at timestamptz;
+
+-- Status vocabulary expands from Draft/Sent/Partially Received/Received/
+-- Cancelled to Draft/Ordered/Partially Received/Received/Invoiced/Completed/
+-- Cancelled. 'Invoiced' and 'Completed' are set automatically (by the receive
+-- route and the invoice-payment route respectively) but stay manually
+-- overridable, same as everything else in this table. No live data needed
+-- migrating for the Sent->Ordered rename — see the one-off update below.
+update purchase_orders set status = 'Ordered' where status = 'Sent';
+
+-- Supplier's own code for the item, distinct from this app's internal Spare
+-- Parts SKU — lets an imported invoice line match back to a PO line even
+-- when the free-text description wording differs slightly.
+alter table purchase_order_line_items add column if not exists supplier_product_code text default '';
+
+-- delivery_charge/discount are their own fields (not folded into subtotal)
+-- so the cost summary can show them as distinct lines, matching how a real
+-- supplier invoice itemizes them. source records how the invoice entered the
+-- system ('manual' | 'ai_import'), source_file_url keeps the uploaded
+-- PDF/photo for audit purposes when it came in via AI import.
+alter table purchase_order_invoices add column if not exists delivery_charge numeric not null default 0;
+alter table purchase_order_invoices add column if not exists discount numeric not null default 0;
+alter table purchase_order_invoices add column if not exists source text not null default 'manual';
+alter table purchase_order_invoices add column if not exists source_file_url text;
+
+alter table purchase_order_invoice_line_items add column if not exists supplier_product_code text default '';
+
+-- Purchase-cost tracking on Spare Parts — last_purchase_cost/avg_purchase_cost
+-- and the last supplier are kept in sync by app/api/purchase-orders/[id]/
+-- receive whenever a line tied to inventory is received, the same
+-- "child action updates a cached parent total" shape used throughout this
+-- app (jobs.amount_paid, purchase_order_invoices.amount_paid, etc).
+alter table parts add column if not exists last_purchase_cost numeric;
+alter table parts add column if not exists avg_purchase_cost numeric;
+alter table parts add column if not exists last_purchase_supplier_id uuid references suppliers(id);
+alter table parts add column if not exists last_purchase_supplier_name text default '';
+-- Only parts explicitly flagged need a serial/batch prompt on receive —
+-- most stock (cable, connectors, breakers bought in bulk) has no individual
+-- identity worth tracking.
+alter table parts add column if not exists track_serials boolean not null default false;
+
+create table if not exists part_serials (
+  id uuid primary key default gen_random_uuid(),
+  part_id uuid not null references parts(id) on delete cascade,
+  purchase_order_id uuid references purchase_orders(id) on delete set null,
+  serial_number text not null default '',
+  batch_number text not null default '',
+  status text not null default 'In Stock', -- In Stock, Used, Returned
+  job_id uuid references jobs(id) on delete set null,
+  received_date date not null default current_date,
+  notes text default '',
+  created_at timestamptz not null default now()
+);
+
+-- Photos/documents/delivery dockets attached to a PO — same shape as
+-- job_documents.
+create table if not exists po_documents (
+  id uuid primary key default gen_random_uuid(),
+  purchase_order_id uuid not null references purchase_orders(id) on delete cascade,
+  label text not null default '',
+  category text not null default 'Document',
+  file_url text not null,
+  uploaded_by text not null default '',
+  created_at timestamptz not null default now()
+);
+
+-- Combined activity/approval-history feed for the PO Details page's History
+-- tab — same shape as job_activity. type is 'status_change' |
+-- 'approval' | 'note' | 'invoice_matched' | 'mismatch_flag'.
+create table if not exists po_activity (
+  id uuid primary key default gen_random_uuid(),
+  purchase_order_id uuid not null references purchase_orders(id) on delete cascade,
+  type text not null default 'note',
+  message text not null default '',
+  created_by text not null default '',
+  created_at timestamptz not null default now()
+);
+
+-- Self-service hours worked, logged directly against a job by the employee
+-- who did the work — distinct from payroll_allocations, which is the
+-- admin/manager-entered figure tied to an actual pay run. Kept as two
+-- separate sources deliberately: this table is the field-reported "what did
+-- I actually do today" log (visible to everyone, shown as Logged Hours),
+-- while payroll_allocations stays the sole source for labor $ cost and
+-- Statistics, so a self-logged entry can never silently affect pay or
+-- margin figures without a manager processing it through Payroll.
+create table if not exists job_hour_logs (
+  id uuid primary key default gen_random_uuid(),
+  job_id uuid not null references jobs(id) on delete cascade,
+  employee_id uuid references employees(id) on delete set null,
+  employee_name text not null default '',
+  date date not null default current_date,
+  hours numeric not null default 0,
+  notes text default '',
+  created_by text default '',
+  created_at timestamptz not null default now()
+);

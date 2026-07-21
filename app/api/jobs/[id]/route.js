@@ -45,12 +45,13 @@ export async function GET(req, { params }) {
   const jobs = await sql`select * from jobs where id = ${params.id}`;
   const job = jobs[0];
   if (!job) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  const [lineItems, payments, assignees, documents, activity] = await Promise.all([
+  const [lineItems, payments, assignees, documents, activity, hourLogs] = await Promise.all([
     sql`select * from job_line_items where job_id = ${params.id} order by sort_order asc`,
     sql`select * from job_payments where job_id = ${params.id} order by date desc, created_at desc`,
     sql`select employee_id, employee_name from job_assignees where job_id = ${params.id} order by employee_name asc`,
     sql`select * from job_documents where job_id = ${params.id} order by created_at desc`,
-    sql`select * from job_activity where job_id = ${params.id} order by created_at desc`
+    sql`select * from job_activity where job_id = ${params.id} order by created_at desc`,
+    sql`select * from job_hour_logs where job_id = ${params.id} order by date desc, created_at desc`
   ]);
   return NextResponse.json({
     ...serializeDates(job, JOB_DATE_FIELDS),
@@ -58,7 +59,8 @@ export async function GET(req, { params }) {
     payments: payments.map((p) => serializeDates(p, ['date'])),
     assignees,
     documents,
-    activity
+    activity,
+    hourLogs: hourLogs.map((h) => serializeDates(h, ['date']))
   });
 }
 

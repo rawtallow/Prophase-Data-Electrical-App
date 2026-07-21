@@ -23,10 +23,15 @@ export async function POST(req, { params }) {
     update purchase_orders set
       approval_status = ${decision === 'approved' ? 'Approved' : 'Rejected'},
       approval_note = ${note || ''},
-      reviewed_by = ${session.name}
+      reviewed_by = ${session.name},
+      updated_at = now()
     where id = ${params.id}
     returning *
   `;
   if (!rows[0]) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  await sql`
+    insert into po_activity (purchase_order_id, type, message, created_by)
+    values (${params.id}, 'approval', ${decision === 'approved' ? 'Approved' : `Rejected${note ? ': ' + note : ''}`}, ${session.name})
+  `;
   return NextResponse.json(rows[0]);
 }

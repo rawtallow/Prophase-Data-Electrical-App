@@ -35,10 +35,29 @@ export async function POST(req, { params }) {
   const newStatus = statusFor(Number(invoice.total), newPaid);
   const paymentDate = date || sydneyToday();
 
-  await sql.transaction([
+  const queries = [
     sql`insert into purchase_order_invoice_payments (purchase_order_invoice_id, date, amount, method, note, created_by) values (${params.id}, ${paymentDate}, ${cleanAmount}, ${method || ''}, ${note || ''}, ${session.name})`,
     sql`update purchase_order_invoices set amount_paid = ${newPaid}, status = ${newStatus} where id = ${params.id}`
-  ]);
+  ];
+
+  // Automatic reconciliation: once every invoice against a fully-received PO
+  // is paid off, there's nothing left to do on it — flip it to Completed
+  // (still manually reversible from the PO Details page like any other
+  // status). Checks every invoice on the PO, not just this one, since a PO
+  // delivered in stages can have more than one.
+  if (newStatus === 'Paid') {
+    const po = await sql`select id, status from purchase_orders where id = ${invoice.purchase_order_id}`;
+    if (po[0] && (po[0].status === 'Received' || po[0].status === 'Invoiced')) {
+      const otherInvoices = await sql`select status from purchase_order_invoices where purchase_order_id = ${invoice.purchase_order_id} and id != ${params.id}`;
+      const allPaid = otherInvoices.every((i) => i.status === 'Paid');
+      if (allPaid) {
+        queries.push(sql`update purchase_orders set status = 'Completed', updated_at = now() where id = ${invoice.purchase_order_id}`);
+        queries.push(sql`insert into po_activity (purchase_order_id, type, message, created_by) values (${invoice.purchase_order_id}, 'status_change', 'Status changed automatically to Completed — fully received and invoices paid', ${session.name})`);
+      }
+    }
+  }
+
+  await sql.transaction(queries);
 
   const [updatedRows, payments] = await Promise.all([
     sql`

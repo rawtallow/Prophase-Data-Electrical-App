@@ -1,15 +1,43 @@
 'use client';
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast, confirmDialog } from '../ui-feedback';
-import Modal from '../modal';
-import { money, slug, toDateInputValue as dstr, sydneyToday } from '../../../lib/format';
-import { getJson, getList } from '../../../lib/api';
+import { money, slug, toDateInputValue as dstr, toDisplayDate as fmtDate } from '../../../lib/format';
+import { getList } from '../../../lib/api';
 
 const APPROVAL_STATUSES = ['Pending Approval', 'Approved', 'Rejected'];
-const STATUSES = ['Draft', 'Sent', 'Partially Received', 'Received', 'Cancelled'];
+const STATUSES = ['Draft', 'Ordered', 'Partially Received', 'Received', 'Invoiced', 'Completed', 'Cancelled'];
 
-function emptyInvoiceForm() { return { invoiceNumber: '', invoiceDate: sydneyToday() }; }
+function invoiceStatusLabel(po) {
+  if (!po.invoice_count) return 'Not Invoiced';
+  const total = Number(po.invoiced_total);
+  const paid = Number(po.invoice_paid_total);
+  if (paid <= 0) return 'Unpaid';
+  if (paid >= total) return 'Paid';
+  return 'Partially Paid';
+}
+
+// Small per-row "⋮" options menu for the less-frequent actions — reviewing,
+// receiving, and everything else now happens on the PO's own detail page.
+// Same shape as quotes-app.js's RowMenu.
+function RowMenu({ children }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onClickOutside(e) { if (!ref.current?.contains(e.target)) setOpen(false); }
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, [open]);
+
+  return (
+    <div className="row-menu" ref={ref} onClick={(e) => e.stopPropagation()}>
+      <button type="button" className="row-menu-trigger" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-label="More actions">⋮</button>
+      {open && <div className="row-menu-list" onClick={() => setOpen(false)}>{children}</div>}
+    </div>
+  );
+}
 
 export default function PurchaseOrdersApp({ initialOrders, myId, fullAccess }) {
   const router = useRouter();
@@ -19,24 +47,18 @@ export default function PurchaseOrdersApp({ initialOrders, myId, fullAccess }) {
   const [search, setSearch] = useState('');
   const [busyId, setBusyId] = useState(null);
   const [creating, setCreating] = useState(false);
-  const [reviewModal, setReviewModal] = useState(null); // { po, note }
-  const [reviewing, setReviewing] = useState(false);
-  const [receiveModal, setReceiveModal] = useState(null); // { po, lines: [{ id, description, qty, qtyReceived, qtyNow, unitCost, poUnitCost }] }
-  const [receiving, setReceiving] = useState(false);
-  const [logInvoice, setLogInvoice] = useState(false);
-  const [invoiceForm, setInvoiceForm] = useState(emptyInvoiceForm());
 
   // Wholesalers require a PO number before they'll quote a price, so this
   // reserves a real, permanent number immediately (see the draft route's
   // nextPoNumber()) rather than waiting for the form to be saved — then
-  // drops straight into editing that new, mostly-blank PO.
+  // drops straight into the new PO's own detail page to fill everything in.
   async function createNew() {
     setCreating(true);
     try {
       const res = await fetch('/api/purchase-orders/draft', { method: 'POST' });
       if (res.ok) {
         const po = await res.json();
-        router.push(`/purchase-orders/${po.id}/edit`);
+        router.push(`/purchase-orders/${po.id}`);
       } else {
         const d = await res.json().catch(() => ({}));
         toast.error(d.error || 'Could not start a new purchase order');
@@ -59,9 +81,6 @@ export default function PurchaseOrdersApp({ initialOrders, myId, fullAccess }) {
   function canEditOrDelete(po) {
     return fullAccess || (po.created_by_id === myId && po.approval_status !== 'Approved');
   }
-  function canReceive(po) {
-    return po.approval_status === 'Approved' && po.status !== 'Cancelled' && po.status !== 'Received';
-  }
 
   async function del(id) {
     const ok = await confirmDialog('Delete this purchase order? This cannot be undone.', {
@@ -82,97 +101,6 @@ export default function PurchaseOrdersApp({ initialOrders, myId, fullAccess }) {
       }
     } finally {
       setBusyId(null);
-    }
-  }
-
-  async function submitReview(decision) {
-    setReviewing(true);
-    try {
-      const res = await fetch(`/api/purchase-orders/${reviewModal.po.id}/review`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ decision, note: reviewModal.note })
-      });
-      if (res.ok) {
-        toast.success(decision === 'approved' ? 'Purchase order approved' : 'Sent back to the drafter');
-        setReviewModal(null);
-        await refresh();
-      } else {
-        const d = await res.json().catch(() => ({}));
-        toast.error(d.error || 'Could not save review');
-      }
-    } finally {
-      setReviewing(false);
-    }
-  }
-
-  async function openReceive(po) {
-    setBusyId(po.id);
-    try {
-      const full = await getJson(`/api/purchase-orders/${po.id}`);
-      const lines = (full.lineItems || []).map((li) => ({
-        id: li.id,
-        description: li.description,
-        qty: Number(li.qty),
-        qtyReceived: Number(li.qty_received),
-        qtyNow: Math.max(Number(li.qty) - Number(li.qty_received), 0),
-        unitCost: Number(li.unit_cost),
-        poUnitCost: Number(li.unit_cost)
-      }));
-      setReceiveModal({ po, lines });
-      setLogInvoice(false);
-      setInvoiceForm(emptyInvoiceForm());
-    } catch (err) {
-      toast.error(err.message);
-    } finally {
-      setBusyId(null);
-    }
-  }
-  function updateReceiveQty(lineId, value) {
-    setReceiveModal({
-      ...receiveModal,
-      lines: receiveModal.lines.map((l) => (l.id === lineId ? { ...l, qtyNow: value } : l))
-    });
-  }
-  function updateReceiveCost(lineId, value) {
-    setReceiveModal({
-      ...receiveModal,
-      lines: receiveModal.lines.map((l) => (l.id === lineId ? { ...l, unitCost: value } : l))
-    });
-  }
-  async function submitReceive() {
-    const receivingLines = receiveModal.lines.filter((l) => (Number(l.qtyNow) || 0) > 0);
-    const lines = receivingLines.map((l) => ({ lineItemId: l.id, qtyNow: Number(l.qtyNow) || 0 }));
-    if (lines.length === 0) return toast.error('Enter a quantity for at least one item');
-    if (logInvoice && !invoiceForm.invoiceNumber.trim()) return toast.error("Enter the supplier's invoice number");
-
-    const body = { lines };
-    if (logInvoice) {
-      body.invoice = {
-        invoiceNumber: invoiceForm.invoiceNumber,
-        invoiceDate: invoiceForm.invoiceDate,
-        lines: receivingLines.map((l) => ({ lineItemId: l.id, unitCost: Number(l.unitCost) || 0 }))
-      };
-    }
-
-    setReceiving(true);
-    try {
-      const res = await fetch(`/api/purchase-orders/${receiveModal.po.id}/receive`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      });
-      if (res.ok) {
-        const result = await res.json();
-        toast.success(result.invoiceId ? 'Received items logged — invoice recorded' : 'Received items logged — stock updated');
-        setReceiveModal(null);
-        await refresh();
-      } else {
-        const d = await res.json().catch(() => ({}));
-        toast.error(d.error || 'Could not log received items');
-      }
-    } finally {
-      setReceiving(false);
     }
   }
 
@@ -207,44 +135,34 @@ export default function PurchaseOrdersApp({ initialOrders, myId, fullAccess }) {
         <table>
           <thead>
             <tr>
-              <th>PO #</th><th>Supplier</th><th>Job</th><th>Date</th><th>Approval</th><th>Status</th>
-              <th className="num">Total</th><th>Created By</th><th>Actions</th>
+              <th>PO #</th><th>Supplier</th><th>Job</th><th>Client</th>
+              <th className="num">Total</th><th>Status</th><th>Invoice Status</th><th>Created</th><th>Last Updated</th><th></th>
             </tr>
           </thead>
           <tbody>
             {list.map((po) => {
               const busy = busyId === po.id;
-              const canReview = fullAccess && po.approval_status === 'Pending Approval';
               const canPrint = fullAccess && po.approval_status === 'Approved';
               return (
-                <tr key={po.id}>
-                  <td data-label="PO #">{po.po_number}</td>
-                  <td data-label="Supplier">{po.supplier_name}</td>
-                  <td data-label="Job">{po.job_number || '—'}</td>
-                  <td data-label="Date">{dstr(po.date)}</td>
-                  <td data-label="Approval">
-                    <span className={`badge ${slug(po.approval_status)}`}>{po.approval_status}</span>
-                    {po.approval_status === 'Rejected' && po.approval_note && (
-                      <div className="small-note" style={{ marginTop: 4, maxWidth: 200 }}>{po.approval_note}</div>
-                    )}
+                <tr key={po.id} onClick={() => router.push(`/purchase-orders/${po.id}`)} style={{ cursor: 'pointer' }}>
+                  <td data-label="PO #" style={{ color: 'var(--amber-dark)', fontWeight: 650 }}>
+                    {po.po_number}
+                    {po.approval_status === 'Pending Approval' && <div className="small-note" style={{ color: 'var(--amber-dark)' }}>Awaiting approval</div>}
+                    {po.approval_status === 'Rejected' && <div className="small-note" style={{ color: 'var(--red)' }}>Rejected</div>}
                   </td>
-                  <td data-label="Status"><span className={`badge ${slug(po.status)}`}>{po.status}</span></td>
+                  <td data-label="Supplier">{po.supplier_name || '—'}</td>
+                  <td data-label="Job">{po.job_number || '—'}</td>
+                  <td data-label="Client">{po.client_name || '—'}</td>
                   <td className="num" data-label="Total">{money(po.total)}</td>
-                  <td data-label="Created By">{po.created_by || '—'}</td>
+                  <td data-label="Status"><span className={`badge ${slug(po.status)}`}>{po.status}</span></td>
+                  <td data-label="Invoice Status"><span className={`badge ${slug(invoiceStatusLabel(po))}`}>{invoiceStatusLabel(po)}</span></td>
+                  <td data-label="Created">{dstr(po.date)}</td>
+                  <td data-label="Last Updated">{po.updated_at ? fmtDate(po.updated_at) : '—'}</td>
                   <td className="cell-actions" data-label="">
-                    <div className="row-actions">
-                      {canReview && (
-                        <button className="btn amber sm" disabled={busy} onClick={() => setReviewModal({ po, note: '' })}>
-                          Review
-                        </button>
-                      )}
-                      {canEditOrDelete(po) && <a className="btn ghost sm" href={`/purchase-orders/${po.id}/edit`}>Edit</a>}
+                    <RowMenu>
                       {canPrint && <a className="btn ghost sm" href={`/purchase-orders/${po.id}/print`} target="_blank" rel="noreferrer">Print</a>}
-                      {canReceive(po) && <button className="btn ghost sm" disabled={busy} onClick={() => openReceive(po)}>Receive Items</button>}
-                      {canEditOrDelete(po) && (
-                        <button className="btn danger sm" disabled={busy} onClick={() => del(po.id)}>{busy ? '…' : 'Delete'}</button>
-                      )}
-                    </div>
+                      {canEditOrDelete(po) && <button className="btn danger sm" disabled={busy} onClick={() => del(po.id)}>{busy ? '…' : 'Delete'}</button>}
+                    </RowMenu>
                   </td>
                 </tr>
               );
@@ -253,109 +171,6 @@ export default function PurchaseOrdersApp({ initialOrders, myId, fullAccess }) {
         </table>
         {list.length === 0 && <div className="empty">No purchase orders match your filters.</div>}
       </div>
-
-      <Modal open={!!reviewModal}>
-        {reviewModal && (
-          <>
-            <h3>Review Purchase Order {reviewModal.po.po_number}</h3>
-            <p className="small-note">
-              {reviewModal.po.supplier_name} — {money(reviewModal.po.total)} — drafted by {reviewModal.po.created_by || 'unknown'}
-            </p>
-            <div className="field">
-              <label>Note (shown to the drafter, e.g. what to fix if rejecting)</label>
-              <textarea rows={3} value={reviewModal.note} onChange={(e) => setReviewModal({ ...reviewModal, note: e.target.value })} />
-            </div>
-            <div className="modal-actions">
-              <button className="btn ghost" disabled={reviewing} onClick={() => setReviewModal(null)}>Cancel</button>
-              <button className="btn danger-solid" disabled={reviewing} onClick={() => submitReview('rejected')}>
-                {reviewing ? '…' : 'Reject'}
-              </button>
-              <button className="btn amber" disabled={reviewing} onClick={() => submitReview('approved')}>
-                {reviewing ? '…' : 'Approve'}
-              </button>
-            </div>
-          </>
-        )}
-      </Modal>
-
-      <Modal open={!!receiveModal} wide>
-        {receiveModal && (
-          <>
-            <h3>Receive Items — {receiveModal.po.po_number}</h3>
-            <p className="small-note">{receiveModal.po.supplier_name}. Enter how many of each item arrived — defaults to what's still outstanding.</p>
-            <table>
-              <thead>
-                <tr>
-                  <th>Item</th><th className="num">Ordered</th><th className="num">Already Received</th><th className="num">Receiving Now</th>
-                  {fullAccess && logInvoice && <th className="num">Invoice Cost</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {receiveModal.lines.map((l) => {
-                  const receivingNow = (Number(l.qtyNow) || 0) > 0;
-                  const mismatch = receivingNow && Number(l.unitCost) !== l.poUnitCost;
-                  return (
-                    <tr key={l.id}>
-                      <td>{l.description}</td>
-                      <td className="num">{l.qty}</td>
-                      <td className="num">{l.qtyReceived}</td>
-                      <td className="num">
-                        <input
-                          type="number" min="0" step="0.01"
-                          max={Math.max(l.qty - l.qtyReceived, 0)}
-                          value={l.qtyNow}
-                          onChange={(e) => updateReceiveQty(l.id, e.target.value)}
-                        />
-                      </td>
-                      {fullAccess && logInvoice && (
-                        <td className="num">
-                          <input
-                            type="number" min="0" step="0.01"
-                            disabled={!receivingNow}
-                            value={l.unitCost}
-                            onChange={(e) => updateReceiveCost(l.id, e.target.value)}
-                          />
-                          {mismatch && (
-                            <div className="small-note" style={{ color: 'var(--amber-dark)', whiteSpace: 'nowrap' }}>
-                              ≠ PO: {money(l.poUnitCost)}
-                            </div>
-                          )}
-                        </td>
-                      )}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-
-            {fullAccess && (
-              <div className="panel" style={{ marginTop: 14, background: 'var(--bg-soft)' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, cursor: 'pointer' }}>
-                  <input type="checkbox" checked={logInvoice} onChange={(e) => setLogInvoice(e.target.checked)} />
-                  Also log the supplier's invoice for this delivery
-                </label>
-                {logInvoice && (
-                  <div className="grid-2" style={{ marginTop: 10 }}>
-                    <div className="field">
-                      <label>Invoice Number *</label>
-                      <input value={invoiceForm.invoiceNumber} onChange={(e) => setInvoiceForm({ ...invoiceForm, invoiceNumber: e.target.value })} />
-                    </div>
-                    <div className="field">
-                      <label>Invoice Date</label>
-                      <input type="date" value={invoiceForm.invoiceDate} onChange={(e) => setInvoiceForm({ ...invoiceForm, invoiceDate: e.target.value })} />
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            <div className="modal-actions">
-              <button className="btn ghost" disabled={receiving} onClick={() => setReceiveModal(null)}>Cancel</button>
-              <button className="btn amber" disabled={receiving} onClick={submitReceive}>{receiving ? 'Saving…' : 'Log Received Items'}</button>
-            </div>
-          </>
-        )}
-      </Modal>
     </>
   );
 }

@@ -57,10 +57,20 @@ export default async function PrintPurchaseOrderPage({ params }) {
         </div>
       )}
 
+      {(po.delivery_address || po.expected_delivery_date) && (
+        <div style={{ marginBottom: 14 }}>
+          <div className="lbl" style={{ fontSize: 11, textTransform: 'uppercase', color: '#64748b', fontWeight: 700 }}>Deliver To</div>
+          {po.delivery_address && <div>{po.delivery_address}</div>}
+          {po.expected_delivery_date && <div>Expected: {dstr(po.expected_delivery_date)}</div>}
+          {po.delivery_method && <div>{po.delivery_method}</div>}
+        </div>
+      )}
+
       <table>
         <thead>
           <tr>
             <th style={{ borderBottom: '2px solid #141414' }}>Description</th>
+            <th style={{ borderBottom: '2px solid #141414' }}>Supplier Code</th>
             <th className="num" style={{ borderBottom: '2px solid #141414' }}>Qty</th>
             <th className="num" style={{ borderBottom: '2px solid #141414' }}>Unit Cost</th>
             <th className="num" style={{ borderBottom: '2px solid #141414' }}>Line Total</th>
@@ -70,6 +80,7 @@ export default async function PrintPurchaseOrderPage({ params }) {
           {lineItems.map((li) => (
             <tr key={li.id}>
               <td>{li.description}</td>
+              <td>{li.supplier_product_code || '—'}</td>
               <td className="num">{li.qty}</td>
               <td className="num">{money(li.unit_cost)}</td>
               <td className="num">{money(li.qty * li.unit_cost)}</td>

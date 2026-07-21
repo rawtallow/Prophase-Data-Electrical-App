@@ -36,6 +36,8 @@ export async function POST(req) {
     sql`delete from purchase_order_invoice_payments`,
     sql`delete from purchase_order_invoice_line_items`,
     sql`delete from purchase_order_invoices`,
+    sql`delete from po_documents`,
+    sql`delete from po_activity`,
     sql`delete from purchase_order_line_items`,
     sql`delete from purchase_orders`,
     sql`delete from payroll_allocations`,
@@ -46,11 +48,13 @@ export async function POST(req) {
     sql`delete from job_assignees`,
     sql`delete from job_documents`,
     sql`delete from job_activity`,
+    sql`delete from job_hour_logs`,
     sql`delete from jobs`,
     sql`delete from quotes`,
     sql`delete from assets`,
     sql`delete from employees`,
     sql`delete from owner_draws`,
+    sql`delete from part_serials`,
     sql`delete from parts`,
     sql`delete from suppliers`,
     sql`delete from clients`,
@@ -143,6 +147,14 @@ export async function POST(req) {
       `);
     }
   }
+  if (Array.isArray(data.jobHourLogs)) {
+    for (const h of data.jobHourLogs) {
+      queries.push(sql`
+        insert into job_hour_logs (id, job_id, employee_id, employee_name, date, hours, notes, created_by, created_at)
+        values (${h.id}, ${h.job_id}, ${h.employee_id || null}, ${h.employee_name || ''}, ${h.date}, ${h.hours}, ${h.notes || ''}, ${h.created_by || ''}, ${h.created_at})
+      `);
+    }
+  }
   for (const pe of data.payrollEntries) {
     queries.push(sql`
       insert into payroll_entries (id, pay_number, employee_id, employee_name, hourly_rate, date_paid, period_start, period_end, gross_pay, net_pay, notes)
@@ -160,8 +172,10 @@ export async function POST(req) {
   }
   for (const p of data.parts) {
     queries.push(sql`
-      insert into parts (id, name, sku, category, supplier, unit_cost, qty_on_hand, reorder_threshold, notes)
-      values (${p.id}, ${p.name}, ${p.sku}, ${p.category}, ${p.supplier}, ${p.unit_cost}, ${p.qty_on_hand}, ${p.reorder_threshold}, ${p.notes})
+      insert into parts (id, name, sku, category, supplier, unit_cost, qty_on_hand, reorder_threshold, notes,
+        last_purchase_cost, avg_purchase_cost, last_purchase_supplier_id, last_purchase_supplier_name, track_serials)
+      values (${p.id}, ${p.name}, ${p.sku}, ${p.category}, ${p.supplier}, ${p.unit_cost}, ${p.qty_on_hand}, ${p.reorder_threshold}, ${p.notes},
+        ${p.last_purchase_cost ?? null}, ${p.avg_purchase_cost ?? null}, ${p.last_purchase_supplier_id || null}, ${p.last_purchase_supplier_name || ''}, ${!!p.track_serials})
     `);
   }
   if (Array.isArray(data.counters)) {
@@ -206,10 +220,14 @@ export async function POST(req) {
   if (Array.isArray(data.purchaseOrders)) {
     for (const po of data.purchaseOrders) {
       queries.push(sql`
-        insert into purchase_orders (id, po_number, date, supplier_id, supplier_name, job_id, job_number, status,
-          subtotal, tax_rate, tax, total, notes, created_at, approval_status, created_by_id, created_by, approval_note, reviewed_by)
-        values (${po.id}, ${po.po_number}, ${po.date}, ${po.supplier_id || null}, ${po.supplier_name}, ${po.job_id || null}, ${po.job_number || ''}, ${po.status},
-          ${po.subtotal}, ${po.tax_rate}, ${po.tax}, ${po.total}, ${po.notes}, ${po.created_at},
+        insert into purchase_orders (id, po_number, date, supplier_id, supplier_name, job_id, job_number,
+          client_id, client_name, asset_id, quote_id, assigned_to_id, assigned_to_name,
+          delivery_method, delivery_address, expected_delivery_date, delivery_notes, status,
+          subtotal, tax_rate, tax, total, notes, created_at, updated_at, approval_status, created_by_id, created_by, approval_note, reviewed_by)
+        values (${po.id}, ${po.po_number}, ${po.date}, ${po.supplier_id || null}, ${po.supplier_name}, ${po.job_id || null}, ${po.job_number || ''},
+          ${po.client_id || null}, ${po.client_name || ''}, ${po.asset_id || null}, ${po.quote_id || null}, ${po.assigned_to_id || null}, ${po.assigned_to_name || ''},
+          ${po.delivery_method || ''}, ${po.delivery_address || ''}, ${po.expected_delivery_date || null}, ${po.delivery_notes || ''}, ${po.status},
+          ${po.subtotal}, ${po.tax_rate}, ${po.tax}, ${po.total}, ${po.notes}, ${po.created_at}, ${po.updated_at || null},
           ${po.approval_status || 'Approved'}, ${po.created_by_id || null}, ${po.created_by || ''}, ${po.approval_note || ''}, ${po.reviewed_by || ''})
       `);
     }
@@ -217,8 +235,8 @@ export async function POST(req) {
   if (Array.isArray(data.purchaseOrderLineItems)) {
     for (const li of data.purchaseOrderLineItems) {
       queries.push(sql`
-        insert into purchase_order_line_items (id, purchase_order_id, part_id, description, qty, unit_cost, qty_received, sort_order)
-        values (${li.id}, ${li.purchase_order_id}, ${li.part_id || null}, ${li.description}, ${li.qty}, ${li.unit_cost}, ${li.qty_received}, ${li.sort_order})
+        insert into purchase_order_line_items (id, purchase_order_id, part_id, description, supplier_product_code, qty, unit_cost, qty_received, sort_order)
+        values (${li.id}, ${li.purchase_order_id}, ${li.part_id || null}, ${li.description}, ${li.supplier_product_code || ''}, ${li.qty}, ${li.unit_cost}, ${li.qty_received}, ${li.sort_order})
       `);
     }
   }
@@ -227,16 +245,18 @@ export async function POST(req) {
   if (Array.isArray(data.purchaseOrderInvoices)) {
     for (const pi of data.purchaseOrderInvoices) {
       queries.push(sql`
-        insert into purchase_order_invoices (id, purchase_order_id, invoice_number, invoice_date, subtotal, tax, total, amount_paid, status, notes, created_by, created_at)
-        values (${pi.id}, ${pi.purchase_order_id}, ${pi.invoice_number || ''}, ${pi.invoice_date}, ${pi.subtotal}, ${pi.tax}, ${pi.total}, ${pi.amount_paid}, ${pi.status || 'Unpaid'}, ${pi.notes || ''}, ${pi.created_by || ''}, ${pi.created_at})
+        insert into purchase_order_invoices (id, purchase_order_id, invoice_number, invoice_date, subtotal, tax, total,
+          delivery_charge, discount, source, source_file_url, amount_paid, status, notes, created_by, created_at)
+        values (${pi.id}, ${pi.purchase_order_id}, ${pi.invoice_number || ''}, ${pi.invoice_date}, ${pi.subtotal}, ${pi.tax}, ${pi.total},
+          ${pi.delivery_charge || 0}, ${pi.discount || 0}, ${pi.source || 'manual'}, ${pi.source_file_url || null}, ${pi.amount_paid}, ${pi.status || 'Unpaid'}, ${pi.notes || ''}, ${pi.created_by || ''}, ${pi.created_at})
       `);
     }
   }
   if (Array.isArray(data.purchaseOrderInvoiceLineItems)) {
     for (const li of data.purchaseOrderInvoiceLineItems) {
       queries.push(sql`
-        insert into purchase_order_invoice_line_items (id, purchase_order_invoice_id, po_line_item_id, description, qty, unit_cost, sort_order)
-        values (${li.id}, ${li.purchase_order_invoice_id}, ${li.po_line_item_id || null}, ${li.description || ''}, ${li.qty}, ${li.unit_cost}, ${li.sort_order})
+        insert into purchase_order_invoice_line_items (id, purchase_order_invoice_id, po_line_item_id, description, supplier_product_code, qty, unit_cost, sort_order)
+        values (${li.id}, ${li.purchase_order_invoice_id}, ${li.po_line_item_id || null}, ${li.description || ''}, ${li.supplier_product_code || ''}, ${li.qty}, ${li.unit_cost}, ${li.sort_order})
       `);
     }
   }
@@ -245,6 +265,32 @@ export async function POST(req) {
       queries.push(sql`
         insert into purchase_order_invoice_payments (id, purchase_order_invoice_id, date, amount, method, note, created_by, created_at)
         values (${p.id}, ${p.purchase_order_invoice_id}, ${p.date}, ${p.amount}, ${p.method || ''}, ${p.note || ''}, ${p.created_by || ''}, ${p.created_at})
+      `);
+    }
+  }
+  // Optional — older backups won't have these; all three need purchase_orders
+  // (and, for part_serials, parts) already inserted above.
+  if (Array.isArray(data.partSerials)) {
+    for (const s of data.partSerials) {
+      queries.push(sql`
+        insert into part_serials (id, part_id, purchase_order_id, serial_number, batch_number, status, job_id, received_date, notes, created_at)
+        values (${s.id}, ${s.part_id}, ${s.purchase_order_id || null}, ${s.serial_number || ''}, ${s.batch_number || ''}, ${s.status || 'In Stock'}, ${s.job_id || null}, ${s.received_date}, ${s.notes || ''}, ${s.created_at})
+      `);
+    }
+  }
+  if (Array.isArray(data.poDocuments)) {
+    for (const d of data.poDocuments) {
+      queries.push(sql`
+        insert into po_documents (id, purchase_order_id, label, category, file_url, uploaded_by, created_at)
+        values (${d.id}, ${d.purchase_order_id}, ${d.label || ''}, ${d.category || 'Document'}, ${d.file_url}, ${d.uploaded_by || ''}, ${d.created_at})
+      `);
+    }
+  }
+  if (Array.isArray(data.poActivity)) {
+    for (const a of data.poActivity) {
+      queries.push(sql`
+        insert into po_activity (id, purchase_order_id, type, message, created_by, created_at)
+        values (${a.id}, ${a.purchase_order_id}, ${a.type || 'note'}, ${a.message || ''}, ${a.created_by || ''}, ${a.created_at})
       `);
     }
   }

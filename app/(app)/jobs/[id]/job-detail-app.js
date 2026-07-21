@@ -15,9 +15,10 @@ const PAYMENT_METHODS = ['Cash', 'Card', 'Bank Transfer', 'Cheque', 'Other'];
 
 function today() { return dstr(new Date()); }
 function emptyPaymentForm() { return { amount: '', date: today(), method: 'Bank Transfer', note: '' }; }
+function emptyHourForm() { return { employeeId: '', date: today(), hours: '', notes: '' }; }
 
 export default function JobDetailApp({
-  initialJob, initialLineItems, initialPayments, initialAssignees, initialDocuments, initialActivity,
+  initialJob, initialLineItems, initialPayments, initialAssignees, initialDocuments, initialActivity, initialHourLogs,
   clients, employees, assets, linkedQuote, laborCost, actualHours, materialsCost, fullAccess, canManageJobs
 }) {
   const router = useRouter();
@@ -27,10 +28,16 @@ export default function JobDetailApp({
   const [payments, setPayments] = useState(initialPayments);
   const [documents, setDocuments] = useState(initialDocuments);
   const [activity, setActivity] = useState(initialActivity);
+  const [hourLogs, setHourLogs] = useState(initialHourLogs);
   const [tab, setTab] = useState('Overview');
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [duplicating, setDuplicating] = useState(false);
+
+  const [hourForm, setHourForm] = useState(emptyHourForm());
+  const [loggingHours, setLoggingHours] = useState(false);
+  const [deletingHourId, setDeletingHourId] = useState(null);
+  const loggedHours = hourLogs.reduce((s, h) => s + Number(h.hours), 0);
 
   const [noteDraft, setNoteDraft] = useState('');
   const [postingNote, setPostingNote] = useState(false);
@@ -130,6 +137,51 @@ export default function JobDetailApp({
     setPayments(full.payments || []);
     setDocuments(full.documents || []);
     setActivity(full.activity || []);
+    setHourLogs(full.hourLogs || []);
+  }
+
+  async function logHours() {
+    if (!(Number(hourForm.hours) > 0)) return toast.error('Enter hours greater than 0');
+    setLoggingHours(true);
+    try {
+      const res = await fetch(`/api/jobs/${job.id}/hours`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(hourForm)
+      });
+      if (res.ok) {
+        const created = await res.json();
+        setHourLogs([created, ...hourLogs]);
+        setHourForm(emptyHourForm());
+        toast.success('Hours logged');
+      } else {
+        const d = await res.json().catch(() => ({}));
+        toast.error(d.error || 'Could not log hours');
+      }
+    } finally {
+      setLoggingHours(false);
+    }
+  }
+  async function deleteHourLog(logId) {
+    const ok = await confirmDialog('Delete this hour log entry? This cannot be undone.', {
+      title: 'Delete hour log',
+      confirmLabel: 'Delete Entry',
+      danger: true
+    });
+    if (!ok) return;
+    setDeletingHourId(logId);
+    try {
+      const res = await fetch(`/api/jobs/${job.id}/hours/${logId}`, { method: 'DELETE' });
+      if (res.ok) {
+        setHourLogs(hourLogs.filter((h) => h.id !== logId));
+        toast.success('Entry deleted');
+      } else {
+        const d = await res.json().catch(() => ({}));
+        toast.error(d.error || 'Could not delete entry');
+      }
+    } finally {
+      setDeletingHourId(null);
+    }
   }
 
   async function postNote() {
@@ -457,19 +509,70 @@ export default function JobDetailApp({
 
           <div className="panel">
             <h2 className="section-title">Labour Hours</h2>
-            <div className="grid-2">
+            <div className="grid-3">
               <div className="field">
                 <label>Estimated Hours</label>
                 <input type="number" min="0" step="0.25" disabled={!fullAccess} value={job.estimated_hours ?? ''} onChange={(e) => set('estimated_hours', e.target.value)} />
               </div>
               <div className="field">
-                <label>Actual Hours</label>
+                <label>Logged Hours</label>
+                <input type="text" disabled value={loggedHours.toFixed(2)} />
+              </div>
+              <div className="field">
+                <label>Payroll Hours</label>
                 <input type="text" disabled value={fullAccess ? actualHours.toFixed(2) : 'Admin/manager only'} />
               </div>
             </div>
-            {fullAccess && <p className="small-note" style={{ marginTop: -6 }}>Actual Hours is the sum of this job's Payroll hour allocations — log time there, not here.</p>}
+            <p className="small-note" style={{ marginTop: -6 }}>
+              Logged Hours is what's entered below — a running field log, separate from Payroll Hours (the sum of this job's actual Payroll pay-run allocations, which is what drives labour cost).
+            </p>
+            {fullAccess && (
+              <div className="footer-actions">
+                <button className="btn amber" disabled={saving} onClick={() => saveJob()}>{saving ? 'Saving…' : 'Save Changes'}</button>
+              </div>
+            )}
+          </div>
+
+          <div className="panel">
+            <h2 className="section-title">Hour Log</h2>
+            {hourLogs.length === 0 ? (
+              <div className="empty">No hours logged yet.</div>
+            ) : (
+              <table>
+                <thead><tr><th>Date</th><th>Technician</th><th className="num">Hours</th><th>Notes</th><th></th></tr></thead>
+                <tbody>
+                  {hourLogs.map((h) => (
+                    <tr key={h.id}>
+                      <td data-label="Date">{dstr(h.date)}</td>
+                      <td data-label="Technician">{h.employee_name}</td>
+                      <td className="num" data-label="Hours">{Number(h.hours).toFixed(2)}</td>
+                      <td data-label="Notes">{h.notes || '—'}</td>
+                      <td>{fullAccess && <button className="btn danger sm" disabled={deletingHourId === h.id} onClick={() => deleteHourLog(h.id)}>{deletingHourId === h.id ? '…' : 'Delete'}</button>}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+
+            <h2 className="section-title" style={{ marginTop: 18 }}>Log Hours</h2>
+            <div className="grid-3">
+              {fullAccess ? (
+                <div className="field">
+                  <label>Technician</label>
+                  <select value={hourForm.employeeId} onChange={(e) => setHourForm({ ...hourForm, employeeId: e.target.value })}>
+                    <option value="">— You —</option>
+                    {employees.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
+                  </select>
+                </div>
+              ) : (
+                <div className="field"><label>Technician</label><input type="text" disabled value="You" /></div>
+              )}
+              <div className="field"><label>Date</label><input type="date" value={hourForm.date} onChange={(e) => setHourForm({ ...hourForm, date: e.target.value })} /></div>
+              <div className="field"><label>Hours</label><input type="number" min="0" step="0.25" value={hourForm.hours} onChange={(e) => setHourForm({ ...hourForm, hours: e.target.value })} /></div>
+            </div>
+            <div className="field"><label>Notes</label><input value={hourForm.notes} onChange={(e) => setHourForm({ ...hourForm, notes: e.target.value })} placeholder="What was done, optional" /></div>
             <div className="footer-actions">
-              <button className="btn amber" disabled={saving} onClick={() => saveJob()}>{saving ? 'Saving…' : 'Save Changes'}</button>
+              <button className="btn amber" disabled={loggingHours} onClick={logHours}>{loggingHours ? 'Logging…' : 'Log Hours'}</button>
             </div>
           </div>
         </div>

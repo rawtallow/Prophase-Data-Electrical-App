@@ -33,7 +33,7 @@ export default function PartsApp({ initialParts, canManage }) {
       });
       if (res.ok) {
         const po = await res.json();
-        router.push(`/purchase-orders/${po.id}/edit`);
+        router.push(`/purchase-orders/${po.id}`);
       } else {
         const d = await res.json().catch(() => ({}));
         toast.error(d.error || 'Could not start a purchase order');
@@ -54,13 +54,14 @@ export default function PartsApp({ initialParts, canManage }) {
   }
 
   function emptyPart() {
-    return { name: '', sku: '', category: '', supplier: '', unitCost: 0, qtyOnHand: 0, reorderThreshold: 0, notes: '' };
+    return { name: '', sku: '', category: '', supplier: '', unitCost: 0, qtyOnHand: 0, reorderThreshold: 0, notes: '', trackSerials: false };
   }
   function openNew() { setModal(emptyPart()); }
   function openEdit(p) {
     setModal({
       id: p.id, name: p.name, sku: p.sku || '', category: p.category || '', supplier: p.supplier || '',
-      unitCost: p.unit_cost, qtyOnHand: p.qty_on_hand, reorderThreshold: p.reorder_threshold, notes: p.notes || ''
+      unitCost: p.unit_cost, qtyOnHand: p.qty_on_hand, reorderThreshold: p.reorder_threshold, notes: p.notes || '',
+      trackSerials: !!p.track_serials
     });
   }
 
@@ -141,8 +142,8 @@ export default function PartsApp({ initialParts, canManage }) {
         <table>
           <thead>
             <tr>
-              <th>Name</th><th>SKU</th><th>Category</th><th>Supplier</th>
-              <th className="num">Unit Cost</th><th className="num">Qty on Hand</th><th className="num">Reorder At</th>
+              <th>Name</th><th>SKU</th><th>Category</th><th>Last Supplier</th>
+              <th className="num">Unit Cost</th><th className="num">Avg / Last Cost</th><th className="num">Qty on Hand</th><th className="num">Reorder At</th>
               <th>Status</th><th>Actions</th>
             </tr>
           </thead>
@@ -155,8 +156,11 @@ export default function PartsApp({ initialParts, canManage }) {
                   <td data-label="Name">{p.name}</td>
                   <td data-label="SKU">{p.sku || '—'}</td>
                   <td data-label="Category">{p.category || '—'}</td>
-                  <td data-label="Supplier">{p.supplier || '—'}</td>
+                  <td data-label="Last Supplier">{p.last_purchase_supplier_name || p.supplier || '—'}</td>
                   <td className="num" data-label="Unit Cost">{money(p.unit_cost)}</td>
+                  <td className="num" data-label="Avg / Last Cost">
+                    {p.avg_purchase_cost != null ? `${money(p.avg_purchase_cost)} / ${money(p.last_purchase_cost)}` : '—'}
+                  </td>
                   <td className="num" data-label="Qty on Hand">{Number(p.qty_on_hand)}</td>
                   <td className="num" data-label="Reorder At">{Number(p.reorder_threshold)}</td>
                   <td data-label="Status"><span className={`badge ${low ? 'lowstock' : 'instock'}`}>{low ? 'Low Stock' : 'OK'}</span></td>
@@ -199,6 +203,10 @@ export default function PartsApp({ initialParts, canManage }) {
               <div className="field"><label>Reorder At</label><input type="number" min="0" step="1" value={modal.reorderThreshold} onChange={(e) => setModal({ ...modal, reorderThreshold: e.target.value })} /></div>
             </div>
             <div className="field"><label>Notes</label><textarea rows={2} value={modal.notes} onChange={(e) => setModal({ ...modal, notes: e.target.value })} /></div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 500, cursor: 'pointer', marginTop: 4 }}>
+              <input type="checkbox" checked={modal.trackSerials} onChange={(e) => setModal({ ...modal, trackSerials: e.target.checked })} />
+              Track serial/batch numbers when this part is received
+            </label>
             <div className="modal-actions">
               <button className="btn ghost" disabled={saving} onClick={() => setModal(null)}>Cancel</button>
               <button className="btn amber" disabled={saving} onClick={save}>{saving ? 'Saving…' : 'Save Part'}</button>
