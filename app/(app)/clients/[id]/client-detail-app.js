@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { toast, confirmDialog } from '../../ui-feedback';
 import { money, slug, toDisplayDate as fmtDate } from '../../../../lib/format';
 import { LEAD_SOURCES } from '../../../../lib/lead-sources';
-import { getList } from '../../../../lib/api';
+import { getList, PENDING_APPROVAL_MESSAGE } from '../../../../lib/api';
 
 const TABS = ['Overview', 'Assets', 'Jobs', 'Documents', 'Invoices', 'Notes', 'Settings'];
 
@@ -165,11 +165,15 @@ export default function ClientDetailApp({
     setBusyAssetId(id);
     try {
       const res = await fetch(`/api/assets/${id}`, { method: 'DELETE' });
+      const d = await res.json().catch(() => ({}));
       if (res.ok) {
-        toast.success('Asset deleted');
-        await refreshAssets();
+        if (d.pending) {
+          toast.success(PENDING_APPROVAL_MESSAGE);
+        } else {
+          toast.success('Asset deleted');
+          await refreshAssets();
+        }
       } else {
-        const d = await res.json().catch(() => ({}));
         toast.error(d.error || 'Could not delete asset');
       }
     } finally {
@@ -187,11 +191,16 @@ export default function ClientDetailApp({
     setDeleting(true);
     try {
       const res = await fetch(`/api/clients/${client.id}`, { method: 'DELETE' });
+      const d = await res.json().catch(() => ({}));
       if (res.ok) {
-        toast.success('Client deleted');
-        router.push('/clients');
+        if (d.pending) {
+          toast.success(PENDING_APPROVAL_MESSAGE);
+          setDeleting(false);
+        } else {
+          toast.success('Client deleted');
+          router.push('/clients');
+        }
       } else {
-        const d = await res.json().catch(() => ({}));
         toast.error(d.error || 'Could not delete client');
         setDeleting(false);
       }

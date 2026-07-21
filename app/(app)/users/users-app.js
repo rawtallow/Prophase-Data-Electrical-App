@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { toast, confirmDialog } from '../ui-feedback';
 import Modal from '../modal';
 import { toDisplayDate as fmtDate } from '../../../lib/format';
-import { getList } from '../../../lib/api';
+import { getList, PENDING_APPROVAL_MESSAGE } from '../../../lib/api';
 
 export default function UsersApp({ initialUsers, myId }) {
   const [users, setUsers] = useState(initialUsers);
@@ -32,9 +32,13 @@ export default function UsersApp({ initialUsers, myId }) {
       const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(modal) });
       const data = await res.json();
       if (!res.ok) { setError(data.error || 'Could not save user'); return; }
-      toast.success(modal.id ? 'Account updated' : 'Account created');
+      if (data.pending) {
+        toast.success(PENDING_APPROVAL_MESSAGE);
+      } else {
+        toast.success(modal.id ? 'Account updated' : 'Account created');
+        await refresh();
+      }
       setModal(null);
-      await refresh();
     } finally {
       setSaving(false);
     }
@@ -50,11 +54,15 @@ export default function UsersApp({ initialUsers, myId }) {
     setBusyId(id);
     try {
       const res = await fetch(`/api/users/${id}`, { method: 'DELETE' });
+      const d = await res.json();
       if (res.ok) {
-        toast.success('Account deleted');
-        await refresh();
+        if (d.pending) {
+          toast.success(PENDING_APPROVAL_MESSAGE);
+        } else {
+          toast.success('Account deleted');
+          await refresh();
+        }
       } else {
-        const d = await res.json();
         toast.error(d.error || 'Could not delete account');
       }
     } finally {
@@ -69,7 +77,8 @@ export default function UsersApp({ initialUsers, myId }) {
         <button className="btn amber sm" onClick={openNew}>+ New Account</button>
       </div>
       <div className="panel small-note" style={{ marginBottom: 14 }}>
-        Admin and Manager have full access to every feature, including payroll, owner draws, and backups.
+        Director and Manager have full access to every feature, including payroll, owner draws, and backups.
+        Subadmin has the same access as Manager, but major/financial actions (deletions, payment voids, payroll, owner draws, backup restore, and user management) are held for a Director to approve on the Approvals page.
         Employee accounts can view/update the Job Log, use Spare Parts, and view client asset info — no pricing, payroll, or client financials.
       </div>
       <div className="panel card-table">
@@ -109,10 +118,12 @@ export default function UsersApp({ initialUsers, myId }) {
             <div className="grid-2">
               <div className="field">
                 <label>Role</label>
-                <select value={modal.role} disabled={modal.id === myId} onChange={(e) => setModal({ ...modal, role: e.target.value })}>
+                <select value={modal.role} onChange={(e) => setModal({ ...modal, role: e.target.value })}>
                   <option value="employee">Employee</option>
                   <option value="manager">Manager</option>
-                  <option value="admin">Admin</option>
+                  <option value="subadmin">Subadmin</option>
+                  <option value="director">Director</option>
+                  {modal.role === 'admin' && <option value="admin">Admin (legacy)</option>}
                 </select>
               </div>
               <div className="field">

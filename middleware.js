@@ -25,8 +25,12 @@ const FULL_ACCESS_PREFIXES = [
   '/api/purchase-order-invoices'
 ];
 
-// Admin-only paths.
+// User-management paths — always narrower than FULL_ACCESS_PREFIXES (manager
+// has never had this, still doesn't). Director/Subadmin/legacy Admin only.
 const ADMIN_ONLY_PREFIXES = ['/users', '/api/users'];
+function isUserManagementRole(role) {
+  return role === 'director' || role === 'subadmin' || role === 'admin';
+}
 
 function isPublic(pathname) {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'));
@@ -77,8 +81,14 @@ export async function middleware(req) {
     return NextResponse.redirect(loginUrl);
   }
 
-  if (matches(pathname, ADMIN_ONLY_PREFIXES) && session.role !== 'admin') {
+  if (matches(pathname, ADMIN_ONLY_PREFIXES) && !isUserManagementRole(session.role)) {
     return NextResponse.redirect(new URL('/dashboard?denied=1', req.url));
+  }
+
+  if (pathname.startsWith('/approvals') || pathname.startsWith('/api/approvals')) {
+    if (session.role !== 'director' && session.role !== 'subadmin') {
+      return NextResponse.redirect(new URL('/dashboard?denied=1', req.url));
+    }
   }
 
   if (matches(pathname, FULL_ACCESS_PREFIXES) && session.role === 'employee') {

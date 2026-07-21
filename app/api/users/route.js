@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { sql } from '../../../lib/db';
 import { getSession, CAN, ROLES } from '../../../lib/auth';
+import { gateOrExecute } from '../../../lib/approvals';
 
 export const runtime = 'nodejs';
 
@@ -26,10 +27,21 @@ export async function POST(req) {
   if (existing[0]) return NextResponse.json({ error: 'An account with that email already exists.' }, { status: 409 });
 
   const hash = await bcrypt.hash(password, 10);
-  const rows = await sql`
-    insert into users (name, email, password_hash, role, active)
-    values (${name.trim()}, ${email.toLowerCase()}, ${hash}, ${role}, true)
-    returning id, name, email, role, active, created_at
-  `;
-  return NextResponse.json(rows[0]);
+
+  const { pending, request, result } = await gateOrExecute({
+    session,
+    actionType: 'create_user',
+    targetId: null,
+    targetLabel: `${name.trim()} (${email.toLowerCase()})`,
+    payload: { name: name.trim(), email: email.toLowerCase(), passwordHash: hash, role },
+    execute: async () => {
+      const rows = await sql`
+        insert into users (name, email, password_hash, role, active)
+        values (${name.trim()}, ${email.toLowerCase()}, ${hash}, ${role}, true)
+        returning id, name, email, role, active, created_at
+      `;
+      return rows[0];
+    }
+  });
+  return NextResponse.json(pending ? { pending: true, request } : result);
 }

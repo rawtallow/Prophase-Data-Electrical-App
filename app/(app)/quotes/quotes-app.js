@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast, confirmDialog } from '../ui-feedback';
 import { money, slug, toDateInputValue as dstr } from '../../../lib/format';
-import { getList } from '../../../lib/api';
+import { getList, PENDING_APPROVAL_MESSAGE } from '../../../lib/api';
 
 const APPROVAL_STATUSES = ['Pending Approval', 'Approved', 'Rejected'];
 const STALE_DAYS = 10;
@@ -71,11 +71,15 @@ export default function QuotesApp({ initialQuotes, myId, fullAccess }) {
     setBusyId(id);
     try {
       const res = await fetch(`/api/quotes/${id}`, { method: 'DELETE' });
+      const d = await res.json().catch(() => ({}));
       if (res.ok) {
-        toast.success('Quote deleted');
-        await refresh();
+        if (d.pending) {
+          toast.success(PENDING_APPROVAL_MESSAGE);
+        } else {
+          toast.success('Quote deleted');
+          await refresh();
+        }
       } else {
-        const d = await res.json().catch(() => ({}));
         toast.error(d.error || 'Could not delete quote');
       }
     } finally {

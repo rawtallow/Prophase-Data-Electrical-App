@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { sql } from '../../../../lib/db';
 import { getSession, CAN } from '../../../../lib/auth';
+import { gateOrExecute } from '../../../../lib/approvals';
 
 export const runtime = 'nodejs';
 
@@ -161,7 +162,7 @@ export async function DELETE(req, { params }) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const rows = await sql`select po_number, created_by_id, approval_status from purchase_orders where id = ${params.id}`;
+  const rows = await sql`select po_number, supplier_name, created_by_id, approval_status from purchase_orders where id = ${params.id}`;
   const existing = rows[0];
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
@@ -173,17 +174,28 @@ export async function DELETE(req, { params }) {
     }
   }
 
-  // Deleting a PO — including a bare stub whose number was reserved but
-  // never used — frees its number back into the pool. See nextPoNumber() in
-  // app/api/purchase-orders/draft/route.js. Skip this for a row that was
-  // already cancelled (relabelled " (Cancelled)" by the PUT handler above) —
-  // its bare number was already released back then, and may since have been
-  // legitimately claimed by a different, newer PO; re-pooling it here could
-  // hand that same number out a second time while it's still live elsewhere.
-  const queries = [sql`delete from purchase_orders where id = ${params.id}`];
-  if (!existing.po_number.endsWith(' (Cancelled)')) {
-    queries.unshift(sql`insert into po_number_pool (po_number) values (${existing.po_number}) on conflict do nothing`);
-  }
-  await sql.transaction(queries);
-  return NextResponse.json({ ok: true });
+  const { pending, request, result } = await gateOrExecute({
+    session,
+    actionType: 'delete_purchase_order',
+    targetId: params.id,
+    targetLabel: `${existing.po_number} — ${existing.supplier_name}`,
+    payload: {},
+    execute: async () => {
+      // Deleting a PO — including a bare stub whose number was reserved but
+      // never used — frees its number back into the pool. See nextPoNumber()
+      // in app/api/purchase-orders/draft/route.js. Skip this for a row that
+      // was already cancelled (relabelled " (Cancelled)" by the PUT handler
+      // above) — its bare number was already released back then, and may
+      // since have been legitimately claimed by a different, newer PO;
+      // re-pooling it here could hand that same number out a second time
+      // while it's still live elsewhere.
+      const queries = [sql`delete from purchase_orders where id = ${params.id}`];
+      if (!existing.po_number.endsWith(' (Cancelled)')) {
+        queries.unshift(sql`insert into po_number_pool (po_number) values (${existing.po_number}) on conflict do nothing`);
+      }
+      await sql.transaction(queries);
+      return { ok: true };
+    }
+  });
+  return NextResponse.json(pending ? { pending: true, request } : result);
 }

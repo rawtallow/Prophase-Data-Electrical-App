@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { toast, confirmDialog } from '../ui-feedback';
 import Modal from '../modal';
 import { money, toDateInputValue as dstr, toDisplayDate as fmtDate } from '../../../lib/format';
-import { getList } from '../../../lib/api';
+import { getList, PENDING_APPROVAL_MESSAGE } from '../../../lib/api';
 
 // toISOString() is UTC-based, so "today" near midnight local time can
 // resolve to the wrong calendar day (e.g. it read one day behind in
@@ -149,12 +149,16 @@ export default function PayrollApp({ initialEmployees, initialEntries, initialDr
       const method = payModal.id ? 'PUT' : 'POST';
       const url = payModal.id ? `/api/payroll/${payModal.id}` : '/api/payroll';
       const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payModal) });
+      const d = await res.json().catch(() => ({}));
       if (res.ok) {
-        toast.success(payModal.id ? 'Pay run updated' : 'Pay run saved');
+        if (d.pending) {
+          toast.success(PENDING_APPROVAL_MESSAGE);
+        } else {
+          toast.success(payModal.id ? 'Pay run updated' : 'Pay run saved');
+          await refreshAll();
+        }
         setPayModal(null);
-        await refreshAll();
       } else {
-        const d = await res.json().catch(() => ({}));
         toast.error(d.error || 'Could not save pay run');
       }
     } finally {
@@ -192,12 +196,16 @@ export default function PayrollApp({ initialEmployees, initialEntries, initialDr
       const method = drawModal.id ? 'PUT' : 'POST';
       const url = drawModal.id ? `/api/draws/${drawModal.id}` : '/api/draws';
       const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(drawModal) });
+      const d = await res.json().catch(() => ({}));
       if (res.ok) {
-        toast.success(drawModal.id ? 'Draw updated' : 'Draw recorded');
+        if (d.pending) {
+          toast.success(PENDING_APPROVAL_MESSAGE);
+        } else {
+          toast.success(drawModal.id ? 'Draw updated' : 'Draw recorded');
+          await refreshAll();
+        }
         setDrawModal(null);
-        await refreshAll();
       } else {
-        const d = await res.json().catch(() => ({}));
         toast.error(d.error || 'Could not save draw');
       }
     } finally {

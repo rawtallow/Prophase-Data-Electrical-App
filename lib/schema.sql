@@ -601,3 +601,39 @@ create table if not exists job_hour_logs (
   created_by text default '',
   created_at timestamptz not null default now()
 );
+
+-- Director/Subadmin roles. 'admin' is kept in the allowed list purely for
+-- backward compatibility with old backup files and any stray row — no new
+-- admin accounts are created going forward, only director/subadmin/manager/
+-- employee. Director sits above admin (full access, plus approval authority
+-- over a subadmin's gated actions); subadmin has the same day-to-day
+-- capabilities admin/manager always had, except the specific actions listed
+-- in lib/approvals.js's GATED_ACTIONS, which become a pending request
+-- instead of executing immediately.
+alter table users drop constraint if exists users_role_check;
+alter table users add constraint users_role_check
+  check (role in ('director', 'subadmin', 'admin', 'manager', 'employee'));
+
+-- Generic pending-approval queue. One table, not one per action type — a
+-- subadmin's gated action inserts a row here (via lib/approvals.js's
+-- gateOrExecute) instead of running immediately; a director reviewing and
+-- approving it re-runs the same performer function that would have executed
+-- directly for a director/manager. target_label is a plain-English
+-- description for display (e.g. "Delete client: Brasilero") since the
+-- underlying record may reference several different tables depending on
+-- action_type. payload carries whatever the performer function needs beyond
+-- target_id (e.g. a quote review's decision/note, a new user's fields).
+create table if not exists approval_requests (
+  id uuid primary key default gen_random_uuid(),
+  action_type text not null,
+  target_id uuid,
+  target_label text not null default '',
+  payload jsonb not null default '{}',
+  status text not null default 'Pending', -- Pending, Approved, Rejected, Cancelled
+  requested_by_id uuid,
+  requested_by text not null default '',
+  reviewed_by text default '',
+  review_note text default '',
+  created_at timestamptz not null default now(),
+  reviewed_at timestamptz
+);

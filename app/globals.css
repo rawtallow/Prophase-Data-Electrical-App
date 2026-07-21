@@ -584,7 +584,7 @@ select {
 }
 /* warn / in-flight */
 .badge.sent, .badge.inprogress, .badge.medium, .badge.rcdsafetyswitchtest,
-.badge.pendingapproval, .badge.paused, .badge.partiallypaid,
+.badge.pendingapproval, .badge.pending, .badge.paused, .badge.partiallypaid,
 .badge.onhold, .badge.awaitingparts, .badge.invoiced {
   background: var(--b-warn-bg); color: var(--b-warn-fg); border-color: rgba(146, 64, 14, 0.14);
 }
@@ -600,12 +600,12 @@ select {
   background: var(--b-bad-bg); color: var(--b-bad-fg); border-color: rgba(185, 28, 28, 0.14);
 }
 /* info */
-.badge.scheduled, .badge.manager, .badge.callout, .badge.certificateofcompliance,
+.badge.scheduled, .badge.manager, .badge.subadmin, .badge.callout, .badge.certificateofcompliance,
 .badge.googlesearch, .badge.websiteenquiry, .badge.ordered, .badge.deliverydocket {
   background: var(--b-info-bg); color: var(--b-info-fg); border-color: rgba(29, 78, 216, 0.14);
 }
 /* brand */
-.badge.admin { background: #241a06; color: var(--amber-light); border-color: rgba(245, 166, 35, 0.3); }
+.badge.admin, .badge.director { background: #241a06; color: var(--amber-light); border-color: rgba(245, 166, 35, 0.3); }
 .badge.repeatcustomer { background: #fdf0da; color: var(--amber-dark); border-color: rgba(180, 118, 9, 0.18); }
 
 /* ============================================================

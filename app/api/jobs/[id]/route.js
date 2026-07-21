@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { sql, isForeignKeyViolation } from '../../../../lib/db';
 import { getSession, CAN } from '../../../../lib/auth';
 import { sydneyToday, serializeDates } from '../../../../lib/format';
+import { gateOrExecute } from '../../../../lib/approvals';
 
 export const runtime = 'nodejs';
 
@@ -157,9 +158,21 @@ export async function DELETE(req, { params }) {
   if (!session || !CAN.manageJobs(session.role)) {
     return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
   }
+  const rows = await sql`select job_number, client_name from jobs where id = ${params.id}`;
+  if (!rows[0]) return NextResponse.json({ error: 'Not found' }, { status: 404 });
   try {
-    await sql`delete from jobs where id = ${params.id}`;
-    return NextResponse.json({ ok: true });
+    const { pending, request, result } = await gateOrExecute({
+      session,
+      actionType: 'delete_job',
+      targetId: params.id,
+      targetLabel: `${rows[0].job_number} — ${rows[0].client_name}`,
+      payload: {},
+      execute: async () => {
+        await sql`delete from jobs where id = ${params.id}`;
+        return { ok: true };
+      }
+    });
+    return NextResponse.json(pending ? { pending: true, request } : result);
   } catch (err) {
     if (isForeignKeyViolation(err)) {
       return NextResponse.json({ error: 'This job has payroll, compliance, or purchase order records linked to it and can\'t be deleted.' }, { status: 409 });

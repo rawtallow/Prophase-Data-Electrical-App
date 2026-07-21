@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { sql } from '../../../../../../lib/db';
 import { getSession, CAN } from '../../../../../../lib/auth';
 import { serializeDates } from '../../../../../../lib/format';
+import { gateOrExecute } from '../../../../../../lib/approvals';
 
 export const runtime = 'nodejs';
 
@@ -31,24 +32,34 @@ export async function DELETE(req, { params }) {
   const payment = payments[0];
   if (!payment) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const newPaid = Math.max(0, Number(invoice.amount_paid) - Number(payment.amount));
-  const newStatus = statusFor(Number(invoice.total), newPaid);
+  const { pending, request, result } = await gateOrExecute({
+    session,
+    actionType: 'void_po_invoice_payment',
+    targetId: payment.id,
+    targetLabel: `$${Number(payment.amount).toFixed(2)} payment on invoice`,
+    payload: {},
+    execute: async () => {
+      const newPaid = Math.max(0, Number(invoice.amount_paid) - Number(payment.amount));
+      const newStatus = statusFor(Number(invoice.total), newPaid);
 
-  await sql.transaction([
-    sql`delete from purchase_order_invoice_payments where id = ${params.paymentId}`,
-    sql`update purchase_order_invoices set amount_paid = ${newPaid}, status = ${newStatus} where id = ${params.id}`
-  ]);
+      await sql.transaction([
+        sql`delete from purchase_order_invoice_payments where id = ${params.paymentId}`,
+        sql`update purchase_order_invoices set amount_paid = ${newPaid}, status = ${newStatus} where id = ${params.id}`
+      ]);
 
-  const [updatedRows, remainingPayments] = await Promise.all([
-    sql`
-      select pi.*, po.po_number, po.supplier_name, po.job_number
-      from purchase_order_invoices pi join purchase_orders po on po.id = pi.purchase_order_id
-      where pi.id = ${params.id}
-    `,
-    sql`select * from purchase_order_invoice_payments where purchase_order_invoice_id = ${params.id} order by date desc, created_at desc`
-  ]);
-  return NextResponse.json({
-    ...serializeDates(updatedRows[0], DATE_FIELDS),
-    payments: remainingPayments.map((p) => serializeDates(p, ['date']))
+      const [updatedRows, remainingPayments] = await Promise.all([
+        sql`
+          select pi.*, po.po_number, po.supplier_name, po.job_number
+          from purchase_order_invoices pi join purchase_orders po on po.id = pi.purchase_order_id
+          where pi.id = ${params.id}
+        `,
+        sql`select * from purchase_order_invoice_payments where purchase_order_invoice_id = ${params.id} order by date desc, created_at desc`
+      ]);
+      return {
+        ...serializeDates(updatedRows[0], DATE_FIELDS),
+        payments: remainingPayments.map((p) => serializeDates(p, ['date']))
+      };
+    }
   });
+  return NextResponse.json(pending ? { pending: true, request } : result);
 }

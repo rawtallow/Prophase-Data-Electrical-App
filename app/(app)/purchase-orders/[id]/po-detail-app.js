@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toast, confirmDialog } from '../../ui-feedback';
 import { money, slug, toDateInputValue as dstr, toDisplayDate as fmtDate, sydneyToday } from '../../../../lib/format';
-import { getJson } from '../../../../lib/api';
+import { getJson, PENDING_APPROVAL_MESSAGE } from '../../../../lib/api';
 
 const TABS = ['Overview', 'Details', 'Line Items', 'Receiving', 'Invoices', 'Documents', 'Notes', 'History'];
 const STATUSES = ['Draft', 'Ordered', 'Partially Received', 'Received', 'Invoiced', 'Completed', 'Cancelled'];
@@ -185,12 +185,16 @@ export default function PoDetailApp({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ decision, note: reviewNote })
       });
+      const d = await res.json().catch(() => ({}));
       if (res.ok) {
-        toast.success(decision === 'approved' ? 'Purchase order approved' : 'Sent back to the drafter');
-        await refreshFull();
+        if (d.pending) {
+          toast.success(PENDING_APPROVAL_MESSAGE);
+        } else {
+          toast.success(decision === 'approved' ? 'Purchase order approved' : 'Sent back to the drafter');
+          await refreshFull();
+        }
         setReviewNote('');
       } else {
-        const d = await res.json().catch(() => ({}));
         toast.error(d.error || 'Could not save review');
       }
     } finally {
@@ -434,13 +438,16 @@ export default function PoDetailApp({
     setVoidingId(paymentId);
     try {
       const res = await fetch(`/api/purchase-order-invoices/${selectedInvoiceId}/payments/${paymentId}`, { method: 'DELETE' });
+      const d = await res.json().catch(() => ({}));
       if (res.ok) {
-        const updated = await getJson(`/api/purchase-order-invoices/${selectedInvoiceId}`);
-        setSelectedInvoice(updated);
-        toast.success('Payment voided');
-        await refreshFull();
+        if (d.pending) {
+          toast.success(PENDING_APPROVAL_MESSAGE);
+        } else {
+          setSelectedInvoice(d);
+          toast.success('Payment voided');
+          await refreshFull();
+        }
       } else {
-        const d = await res.json().catch(() => ({}));
         toast.error(d.error || 'Could not void payment');
       }
     } finally {

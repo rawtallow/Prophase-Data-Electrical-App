@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { sql } from '../../../../../../lib/db';
 import { getSession, CAN } from '../../../../../../lib/auth';
 import { serializeDates } from '../../../../../../lib/format';
+import { gateOrExecute } from '../../../../../../lib/approvals';
 
 export const runtime = 'nodejs';
 
@@ -24,19 +25,31 @@ export async function DELETE(req, { params }) {
   const payment = payments[0];
   if (!payment) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  await sql.transaction([
-    sql`delete from job_payments where id = ${params.paymentId}`,
-    sql`update jobs set amount_paid = greatest(0, amount_paid - ${payment.amount}) where id = ${params.id}`
-  ]);
+  const jobs = await sql`select job_number from jobs where id = ${params.id}`;
 
-  const [updatedJob, lineItems, remainingPayments] = await Promise.all([
-    sql`select * from jobs where id = ${params.id}`,
-    sql`select * from job_line_items where job_id = ${params.id} order by sort_order asc`,
-    sql`select * from job_payments where job_id = ${params.id} order by date desc, created_at desc`
-  ]);
-  return NextResponse.json({
-    ...serializeDates(updatedJob[0], JOB_DATE_FIELDS),
-    lineItems,
-    payments: remainingPayments.map((p) => serializeDates(p, ['date']))
+  const { pending, request, result } = await gateOrExecute({
+    session,
+    actionType: 'void_job_payment',
+    targetId: payment.id,
+    targetLabel: `${jobs[0]?.job_number || ''} — $${Number(payment.amount).toFixed(2)} payment`,
+    payload: {},
+    execute: async () => {
+      await sql.transaction([
+        sql`delete from job_payments where id = ${params.paymentId}`,
+        sql`update jobs set amount_paid = greatest(0, amount_paid - ${payment.amount}) where id = ${params.id}`
+      ]);
+
+      const [updatedJob, lineItems, remainingPayments] = await Promise.all([
+        sql`select * from jobs where id = ${params.id}`,
+        sql`select * from job_line_items where job_id = ${params.id} order by sort_order asc`,
+        sql`select * from job_payments where job_id = ${params.id} order by date desc, created_at desc`
+      ]);
+      return {
+        ...serializeDates(updatedJob[0], JOB_DATE_FIELDS),
+        lineItems,
+        payments: remainingPayments.map((p) => serializeDates(p, ['date']))
+      };
+    }
   });
+  return NextResponse.json(pending ? { pending: true, request } : result);
 }

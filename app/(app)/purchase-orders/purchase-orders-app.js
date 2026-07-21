@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast, confirmDialog } from '../ui-feedback';
 import { money, slug, toDateInputValue as dstr, toDisplayDate as fmtDate } from '../../../lib/format';
-import { getList } from '../../../lib/api';
+import { getList, PENDING_APPROVAL_MESSAGE } from '../../../lib/api';
 
 const APPROVAL_STATUSES = ['Pending Approval', 'Approved', 'Rejected'];
 const STATUSES = ['Draft', 'Ordered', 'Partially Received', 'Received', 'Invoiced', 'Completed', 'Cancelled'];
@@ -92,11 +92,15 @@ export default function PurchaseOrdersApp({ initialOrders, myId, fullAccess }) {
     setBusyId(id);
     try {
       const res = await fetch(`/api/purchase-orders/${id}`, { method: 'DELETE' });
+      const d = await res.json().catch(() => ({}));
       if (res.ok) {
-        toast.success('Purchase order deleted');
-        await refresh();
+        if (d.pending) {
+          toast.success(PENDING_APPROVAL_MESSAGE);
+        } else {
+          toast.success('Purchase order deleted');
+          await refresh();
+        }
       } else {
-        const d = await res.json().catch(() => ({}));
         toast.error(d.error || 'Could not delete purchase order');
       }
     } finally {

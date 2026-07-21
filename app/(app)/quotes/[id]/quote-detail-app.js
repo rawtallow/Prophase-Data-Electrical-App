@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toast, confirmDialog } from '../../ui-feedback';
 import { money, slug, toDateInputValue as dstr, toDisplayDate as fmtDate } from '../../../../lib/format';
-import { getJson } from '../../../../lib/api';
+import { getJson, PENDING_APPROVAL_MESSAGE } from '../../../../lib/api';
 
 const TABS = ['Overview', 'Quote Details', 'Line Items', 'Client', 'Status', 'Documents', 'Notes', 'History'];
 
@@ -99,12 +99,16 @@ export default function QuoteDetailApp({ initialQuote, initialLineItems, clients
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ decision, note: reviewNote })
       });
+      const d = await res.json().catch(() => ({}));
       if (res.ok) {
-        toast.success(decision === 'approved' ? 'Quote approved' : 'Sent back to the drafter');
-        setQuote(await getJson(`/api/quotes/${quote.id}`));
+        if (d.pending) {
+          toast.success(PENDING_APPROVAL_MESSAGE);
+        } else {
+          toast.success(decision === 'approved' ? 'Quote approved' : 'Sent back to the drafter');
+          setQuote(await getJson(`/api/quotes/${quote.id}`));
+        }
         setReviewNote('');
       } else {
-        const d = await res.json().catch(() => ({}));
         toast.error(d.error || 'Could not save review');
       }
     } catch (err) {
@@ -161,11 +165,16 @@ export default function QuoteDetailApp({ initialQuote, initialLineItems, clients
     setDeleting(true);
     try {
       const res = await fetch(`/api/quotes/${quote.id}`, { method: 'DELETE' });
+      const d = await res.json().catch(() => ({}));
       if (res.ok) {
-        toast.success('Quote deleted');
-        router.push('/quotes');
+        if (d.pending) {
+          toast.success(PENDING_APPROVAL_MESSAGE);
+          setDeleting(false);
+        } else {
+          toast.success('Quote deleted');
+          router.push('/quotes');
+        }
       } else {
-        const d = await res.json().catch(() => ({}));
         toast.error(d.error || 'Could not delete quote');
         setDeleting(false);
       }

@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { toast, confirmDialog } from '../ui-feedback';
 import Modal from '../modal';
 import { money } from '../../../lib/format';
-import { getList } from '../../../lib/api';
+import { getList, PENDING_APPROVAL_MESSAGE } from '../../../lib/api';
 
 function isLow(p) {
   return Number(p.reorder_threshold) > 0 && Number(p.qty_on_hand) <= Number(p.reorder_threshold);
@@ -90,11 +90,15 @@ export default function PartsApp({ initialParts, canManage }) {
     setBusyId(id);
     try {
       const res = await fetch(`/api/parts/${id}`, { method: 'DELETE' });
+      const d = await res.json().catch(() => ({}));
       if (res.ok) {
-        toast.success('Part deleted');
-        await refresh();
+        if (d.pending) {
+          toast.success(PENDING_APPROVAL_MESSAGE);
+        } else {
+          toast.success('Part deleted');
+          await refresh();
+        }
       } else {
-        const d = await res.json().catch(() => ({}));
         toast.error(d.error || 'Could not delete part');
       }
     } finally {

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { sql, isForeignKeyViolation } from '../../../../lib/db';
 import { getSession, CAN } from '../../../../lib/auth';
 import { serializeDates } from '../../../../lib/format';
+import { gateOrExecute } from '../../../../lib/approvals';
 
 export const runtime = 'nodejs';
 
@@ -99,19 +100,31 @@ export async function DELETE(req, { params }) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+  const rows = await sql`select quote_number, client_name, created_by_id, approval_status from quotes where id = ${params.id}`;
+  const existing = rows[0];
+  if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
   if (!CAN.editQuotes(session.role)) {
     // Employees can only remove their own quote while it's still awaiting
     // (or was sent back for) review — not once it's been approved.
-    const rows = await sql`select created_by_id, approval_status from quotes where id = ${params.id}`;
-    const existing = rows[0];
-    if (!existing || existing.created_by_id !== session.id || existing.approval_status === 'Approved') {
+    if (existing.created_by_id !== session.id || existing.approval_status === 'Approved') {
       return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
     }
   }
 
   try {
-    await sql`delete from quotes where id = ${params.id}`;
-    return NextResponse.json({ ok: true });
+    const { pending, request, result } = await gateOrExecute({
+      session,
+      actionType: 'delete_quote',
+      targetId: params.id,
+      targetLabel: `${existing.quote_number} — ${existing.client_name}`,
+      payload: {},
+      execute: async () => {
+        await sql`delete from quotes where id = ${params.id}`;
+        return { ok: true };
+      }
+    });
+    return NextResponse.json(pending ? { pending: true, request } : result);
   } catch (err) {
     if (isForeignKeyViolation(err)) {
       return NextResponse.json({ error: 'This quote has already been converted to a job and can\'t be deleted.' }, { status: 409 });

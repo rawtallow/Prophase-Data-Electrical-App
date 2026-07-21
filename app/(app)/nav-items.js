@@ -8,7 +8,9 @@
 //   section        — grouping label used in the mobile drawer
 //   show(role)     — role gate (mirrors the CAN matrix / middleware rules)
 
-const fullAccess = (role) => role === 'admin' || role === 'manager';
+const fullAccess = (role) => role === 'director' || role === 'subadmin' || role === 'admin' || role === 'manager';
+const userManagementRole = (role) => role === 'director' || role === 'subadmin' || role === 'admin';
+const approverRole = (role) => role === 'director' || role === 'subadmin';
 
 // Workspace items follow the natural job of work: bring on a client, quote
 // it, run the job, then the job-support tasks (order materials, track
@@ -30,8 +32,9 @@ export const NAV_ITEMS = [
   { href: '/supplier-invoices', label: 'Supplier Invoices', short: 'Invoices', icon: 'supplierInvoices', section: 'Management', show: fullAccess },
   { href: '/maintenance', label: 'Maintenance', icon: 'maintenance', section: 'Management', show: fullAccess },
   { href: '/documents', label: 'Documents', icon: 'documents', section: 'Management', show: fullAccess },
-  { href: '/users', label: 'Users', icon: 'users', section: 'Management', show: (role) => role === 'admin' },
-  { href: '/backup', label: 'Backup', icon: 'backup', section: 'Management', show: fullAccess }
+  { href: '/users', label: 'Users', icon: 'users', section: 'Management', show: userManagementRole },
+  { href: '/backup', label: 'Backup', icon: 'backup', section: 'Management', show: fullAccess },
+  { href: '/approvals', label: 'Approvals', icon: 'approvals', section: 'Management', show: approverRole }
 ];
 
 export function visibleItems(role) {
@@ -69,6 +72,13 @@ const PATHS = {
     'M17 14.6a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z'
   ],
   menu: ['M4 7h16', 'M4 12h16', 'M4 17h16'],
+  // A clipboard with a checkmark — sign-off/approval, distinct from the
+  // plain document outline already used for "documents".
+  approvals: [
+    'M7.4 4.4H6a2 2 0 0 0-2 2v13.2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6.4a2 2 0 0 0-2-2h-1.4',
+    'M8.6 3h6.8v2.8H8.6z',
+    'M8.4 13.2l2.4 2.4 4.8-5'
+  ],
   // A bill/invoice sheet with a dollar mark — distinct from the plain
   // scalloped "receipts" icon (personal expense photos) since this is a
   // different concept: money owed to suppliers against a specific PO.

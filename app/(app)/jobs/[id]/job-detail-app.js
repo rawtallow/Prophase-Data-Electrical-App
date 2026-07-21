@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toast, confirmDialog } from '../../ui-feedback';
 import { money, slug, toDateInputValue as dstr, toDisplayDate as fmtDate } from '../../../../lib/format';
-import { getJson } from '../../../../lib/api';
+import { getJson, PENDING_APPROVAL_MESSAGE } from '../../../../lib/api';
 
 const TABS = ['Overview', 'Details', 'Schedule', 'Assets', 'Materials', 'Documents', 'Notes', 'History', 'Financials'];
 const STATUSES = ['Quoted', 'Scheduled', 'In Progress', 'On Hold', 'Awaiting Parts', 'Complete', 'Cancelled'];
@@ -288,12 +288,16 @@ export default function JobDetailApp({
     setVoidingId(paymentId);
     try {
       const res = await fetch(`/api/jobs/${job.id}/payments/${paymentId}`, { method: 'DELETE' });
+      const d = await res.json().catch(() => ({}));
       if (res.ok) {
-        const full = await getJson(`/api/jobs/${job.id}`);
-        applyFull(full);
-        toast.success('Payment voided');
+        if (d.pending) {
+          toast.success(PENDING_APPROVAL_MESSAGE);
+        } else {
+          const full = await getJson(`/api/jobs/${job.id}`);
+          applyFull(full);
+          toast.success('Payment voided');
+        }
       } else {
-        const d = await res.json().catch(() => ({}));
         toast.error(d.error || 'Could not void payment');
       }
     } finally {
@@ -330,11 +334,16 @@ export default function JobDetailApp({
     setDeleting(true);
     try {
       const res = await fetch(`/api/jobs/${job.id}`, { method: 'DELETE' });
+      const d = await res.json().catch(() => ({}));
       if (res.ok) {
-        toast.success('Job deleted');
-        router.push('/jobs');
+        if (d.pending) {
+          toast.success(PENDING_APPROVAL_MESSAGE);
+          setDeleting(false);
+        } else {
+          toast.success('Job deleted');
+          router.push('/jobs');
+        }
       } else {
-        const d = await res.json().catch(() => ({}));
         toast.error(d.error || 'Could not delete job');
         setDeleting(false);
       }

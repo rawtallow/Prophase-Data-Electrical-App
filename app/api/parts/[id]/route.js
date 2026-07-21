@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { sql, isForeignKeyViolation } from '../../../../lib/db';
 import { getSession, CAN } from '../../../../lib/auth';
+import { gateOrExecute } from '../../../../lib/approvals';
 
 export const runtime = 'nodejs';
 
@@ -42,9 +43,21 @@ export async function DELETE(req, { params }) {
   if (!session || !CAN.manageParts(session.role)) {
     return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
   }
+  const rows = await sql`select name from parts where id = ${params.id}`;
+  if (!rows[0]) return NextResponse.json({ error: 'Not found' }, { status: 404 });
   try {
-    await sql`delete from parts where id = ${params.id}`;
-    return NextResponse.json({ ok: true });
+    const { pending, request, result } = await gateOrExecute({
+      session,
+      actionType: 'delete_part',
+      targetId: params.id,
+      targetLabel: rows[0].name,
+      payload: {},
+      execute: async () => {
+        await sql`delete from parts where id = ${params.id}`;
+        return { ok: true };
+      }
+    });
+    return NextResponse.json(pending ? { pending: true, request } : result);
   } catch (err) {
     if (isForeignKeyViolation(err)) {
       return NextResponse.json({ error: 'This part is referenced by a purchase order and can\'t be deleted.' }, { status: 409 });

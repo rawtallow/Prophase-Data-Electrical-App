@@ -1,24 +1,26 @@
 import { NextResponse } from 'next/server';
 import { sql } from '../../../../lib/db';
 import { getSession, CAN } from '../../../../lib/auth';
+import { gateOrExecute } from '../../../../lib/approvals';
 
 export const runtime = 'nodejs';
 
 // Full destructive restore: wipes every operational table (NOT the users/accounts
-// table) and reloads it from a previously exported backup file. Confirmation
-// happens client-side before this is ever called.
+// table) and reloads it from a previously exported backup file.
+//
+// Exported (not just used inline by POST below) so the Approvals review
+// endpoint can call the exact same logic when a Director approves a
+// Subadmin's restore request — this is by far the largest and riskiest
+// gated action, so it gets a shared implementation instead of a duplicated
+// copy living in two files that could drift apart.
 //
 // The whole restore runs inside a single database transaction — either every
 // delete and insert succeeds, or none of them do and the existing data is
 // left exactly as it was.
-export async function POST(req) {
-  const session = await getSession();
-  if (!session || !CAN.backup(session.role)) return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
-
-  const data = await req.json();
+export async function performRestore(data) {
   const need = ['clients', 'assets', 'quotes', 'quoteLineItems', 'jobs', 'employees', 'payrollEntries', 'payrollAllocations', 'ownerDraws', 'parts'];
   for (const k of need) {
-    if (!Array.isArray(data[k])) return NextResponse.json({ error: `Backup file is missing "${k}"` }, { status: 400 });
+    if (!Array.isArray(data[k])) throw new Error(`Backup file is missing "${k}"`);
   }
 
   // Build the full list of queries without executing them (the neon driver's
@@ -311,13 +313,32 @@ export async function POST(req) {
     `);
   }
 
+  await sql.transaction(queries);
+}
+
+export async function POST(req) {
+  const session = await getSession();
+  if (!session || !CAN.backup(session.role)) return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
+
+  const data = await req.json();
+
   try {
-    await sql.transaction(queries);
+    const gate = await gateOrExecute({
+      session,
+      actionType: 'restore_backup',
+      targetId: null,
+      targetLabel: `Restore from backup exported ${data.exportedAt || 'unknown date'}`,
+      payload: data,
+      execute: () => performRestore(data)
+    });
+    if (gate.pending) {
+      return NextResponse.json({ pending: true, message: 'Submitted for director approval — no changes have been made yet.' });
+    }
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error('Restore error:', err);
     return NextResponse.json(
-      { error: 'Restore failed — no changes were made. Check the backup file and try again.' },
+      { error: err.message || 'Restore failed — no changes were made. Check the backup file and try again.' },
       { status: 500 }
     );
   }

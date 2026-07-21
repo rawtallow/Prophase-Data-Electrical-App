@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { toast, confirmDialog } from '../ui-feedback';
 import Modal from '../modal';
 import { money, slug, toDateInputValue as dstr, sydneyToday } from '../../../lib/format';
-import { getJson, getList } from '../../../lib/api';
+import { getJson, getList, PENDING_APPROVAL_MESSAGE } from '../../../lib/api';
 
 const STATUSES = ['Unpaid', 'Partially Paid', 'Paid'];
 const PAYMENT_METHODS = ['Cash', 'Card', 'Bank Transfer', 'Cheque', 'Other'];
@@ -79,13 +79,16 @@ export default function SupplierInvoicesApp({ initialInvoices }) {
     setVoidingId(paymentId);
     try {
       const res = await fetch(`/api/purchase-order-invoices/${detailModal.id}/payments/${paymentId}`, { method: 'DELETE' });
+      const d = await res.json().catch(() => ({}));
       if (res.ok) {
-        const updated = await res.json();
-        setDetailModal({ ...detailModal, ...updated });
-        toast.success('Payment voided');
-        await refresh();
+        if (d.pending) {
+          toast.success(PENDING_APPROVAL_MESSAGE);
+        } else {
+          setDetailModal({ ...detailModal, ...d });
+          toast.success('Payment voided');
+          await refresh();
+        }
       } else {
-        const d = await res.json().catch(() => ({}));
         toast.error(d.error || 'Could not void payment');
       }
     } finally {

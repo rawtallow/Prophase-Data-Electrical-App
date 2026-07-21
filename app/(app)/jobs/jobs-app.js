@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { toast, confirmDialog } from '../ui-feedback';
 import Modal from '../modal';
 import { slug, toDateInputValue as dstr, toDisplayDate as fmtDate } from '../../../lib/format';
-import { getList } from '../../../lib/api';
+import { getList, PENDING_APPROVAL_MESSAGE } from '../../../lib/api';
 
 const STATUSES = ['Quoted', 'Scheduled', 'In Progress', 'On Hold', 'Awaiting Parts', 'Complete', 'Cancelled'];
 const PRIORITIES = ['Urgent', 'High', 'Medium', 'Low'];
@@ -92,11 +92,15 @@ export default function JobsApp({ initialJobs, clients, employees, canManageJobs
     setBusyId(id);
     try {
       const res = await fetch(`/api/jobs/${id}`, { method: 'DELETE' });
+      const d = await res.json().catch(() => ({}));
       if (res.ok) {
-        toast.success('Job deleted');
-        await refresh();
+        if (d.pending) {
+          toast.success(PENDING_APPROVAL_MESSAGE);
+        } else {
+          toast.success('Job deleted');
+          await refresh();
+        }
       } else {
-        const d = await res.json().catch(() => ({}));
         toast.error(d.error || 'Could not delete job');
       }
     } finally {
