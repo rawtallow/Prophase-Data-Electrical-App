@@ -38,6 +38,8 @@ export default function ComplianceApp({ initialRecords, jobs, clients, employees
   const [biz, setBiz] = useState(initialBusinessSettings);
   const [bizModal, setBizModal] = useState(null);
   const [savingBiz, setSavingBiz] = useState(false);
+  const [detailsModal, setDetailsModal] = useState(null);
+  const [savingDetails, setSavingDetails] = useState(false);
 
   async function refresh() {
     try {
@@ -68,7 +70,7 @@ export default function ComplianceApp({ initialRecords, jobs, clients, employees
       });
       if (res.ok) {
         setBiz(await res.json());
-        toast.success('Business details updated');
+        toast.success('License and insurance updated');
         setBizModal(null);
       } else {
         const d = await res.json().catch(() => ({}));
@@ -76,6 +78,46 @@ export default function ComplianceApp({ initialRecords, jobs, clients, employees
       }
     } finally {
       setSavingBiz(false);
+    }
+  }
+
+  // Company identity + remittance details. Kept as a separate form from the
+  // licence/insurance one above because they're edited on completely
+  // different cadences — this is set up once and rarely touched, whereas
+  // renewal dates change every year.
+  function openDetailsEdit() {
+    setDetailsModal({
+      legalName: biz.legal_name || '',
+      abn: biz.abn || '',
+      address: biz.address || '',
+      phone: biz.phone || '',
+      email: biz.email || '',
+      website: biz.website || '',
+      bankName: biz.bank_name || '',
+      bankBsb: biz.bank_bsb || '',
+      bankAccount: biz.bank_account || '',
+      paymentTerms: biz.payment_terms || ''
+    });
+  }
+
+  async function saveDetails() {
+    setSavingDetails(true);
+    try {
+      const res = await fetch('/api/business-settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(detailsModal)
+      });
+      if (res.ok) {
+        setBiz(await res.json());
+        toast.success('Business details updated');
+        setDetailsModal(null);
+      } else {
+        const d = await res.json().catch(() => ({}));
+        toast.error(d.error || 'Could not save business details');
+      }
+    } finally {
+      setSavingDetails(false);
     }
   }
 
@@ -197,6 +239,40 @@ export default function ComplianceApp({ initialRecords, jobs, clients, employees
         <div className="card"><div className="label">Records Logged</div><div className="value">{records.length}</div></div>
         <div className={`card${dueSoonCount ? ' warn' : ''}`}><div className="label">Retests Due Soon / Overdue</div><div className="value">{dueSoonCount}</div></div>
         <div className={`card${totalExpiringSoon ? ' warn' : ''}`}><div className="label">Licenses / Insurance Expiring Soon</div><div className="value">{totalExpiringSoon}</div></div>
+      </div>
+
+      <div className="panel">
+        <div className="toolbar" style={{ marginBottom: 12 }}>
+          <h2 className="section-title" style={{ margin: 0 }}>Business Details</h2>
+          {canManage && <button className="btn ghost sm" onClick={openDetailsEdit}>Edit</button>}
+        </div>
+        {!biz.abn && (
+          <div className="small-note" style={{ marginBottom: 10 }}>
+            Your ABN and bank details appear on every quote and tax invoice you issue. An invoice
+            without an ABN isn&apos;t a valid tax invoice, and without bank details your customer
+            has no way to pay it.
+          </div>
+        )}
+        <table>
+          <thead><tr><th>Field</th><th>Value</th></tr></thead>
+          <tbody>
+            <tr><td>Legal / Trading Name</td><td>{biz.legal_name || <span className="small-note">Prophase Data and Electrical</span>}</td></tr>
+            <tr><td>ABN</td><td>{biz.abn || <span className="badge lowstock">Not set</span>}</td></tr>
+            <tr><td>Business Address</td><td>{biz.address || '—'}</td></tr>
+            <tr><td>Phone</td><td>{biz.phone || '—'}</td></tr>
+            <tr><td>Email</td><td>{biz.email || '—'}</td></tr>
+            <tr><td>Website</td><td>{biz.website || '—'}</td></tr>
+            <tr>
+              <td>Bank Account</td>
+              <td>
+                {biz.bank_bsb || biz.bank_account
+                  ? `${biz.bank_name ? biz.bank_name + ' — ' : ''}BSB ${biz.bank_bsb || '—'} / Acct ${biz.bank_account || '—'}`
+                  : <span className="badge lowstock">Not set</span>}
+              </td>
+            </tr>
+            <tr><td>Payment Terms</td><td>{biz.payment_terms || '—'}</td></tr>
+          </tbody>
+        </table>
       </div>
 
       <div className="panel">
@@ -412,6 +488,85 @@ export default function ComplianceApp({ initialRecords, jobs, clients, employees
             <div className="modal-actions">
               <button className="btn ghost" disabled={saving} onClick={() => setModal(null)}>Cancel</button>
               <button className="btn amber" disabled={saving} onClick={save}>{saving ? 'Saving…' : 'Save Record'}</button>
+            </div>
+          </>
+        )}
+      </Modal>
+
+      <Modal open={!!detailsModal} wide>
+        {detailsModal && (
+          <>
+            <h3>Edit Business Details</h3>
+            <div className="small-note" style={{ marginBottom: 12 }}>
+              These appear on every quote, invoice and purchase order you issue.
+            </div>
+            <div className="grid-2">
+              <div className="field">
+                <label>Legal / Trading Name</label>
+                <input
+                  placeholder="Prophase Data and Electrical"
+                  value={detailsModal.legalName}
+                  onChange={(e) => setDetailsModal({ ...detailsModal, legalName: e.target.value })}
+                />
+              </div>
+              <div className="field">
+                <label>ABN</label>
+                <input
+                  placeholder="12 345 678 901"
+                  value={detailsModal.abn}
+                  onChange={(e) => setDetailsModal({ ...detailsModal, abn: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="field">
+              <label>Business Address</label>
+              <input value={detailsModal.address} onChange={(e) => setDetailsModal({ ...detailsModal, address: e.target.value })} />
+            </div>
+            <div className="grid-2">
+              <div className="field">
+                <label>Phone</label>
+                <input value={detailsModal.phone} onChange={(e) => setDetailsModal({ ...detailsModal, phone: e.target.value })} />
+              </div>
+              <div className="field">
+                <label>Email</label>
+                <input type="email" value={detailsModal.email} onChange={(e) => setDetailsModal({ ...detailsModal, email: e.target.value })} />
+              </div>
+            </div>
+            <div className="field">
+              <label>Website</label>
+              <input value={detailsModal.website} onChange={(e) => setDetailsModal({ ...detailsModal, website: e.target.value })} />
+            </div>
+            <h4 style={{ margin: '18px 0 6px' }}>Payment Details</h4>
+            <div className="small-note" style={{ marginBottom: 10 }}>
+              Printed on invoices so customers can pay you without having to ask.
+            </div>
+            <div className="grid-2">
+              <div className="field">
+                <label>Bank Name</label>
+                <input value={detailsModal.bankName} onChange={(e) => setDetailsModal({ ...detailsModal, bankName: e.target.value })} />
+              </div>
+              <div className="field">
+                <label>BSB</label>
+                <input placeholder="000-000" value={detailsModal.bankBsb} onChange={(e) => setDetailsModal({ ...detailsModal, bankBsb: e.target.value })} />
+              </div>
+            </div>
+            <div className="grid-2">
+              <div className="field">
+                <label>Account Number</label>
+                <input value={detailsModal.bankAccount} onChange={(e) => setDetailsModal({ ...detailsModal, bankAccount: e.target.value })} />
+              </div>
+              <div className="field">
+                <label>Payment Terms</label>
+                <input
+                  placeholder="Payment due within 14 days"
+                  value={detailsModal.paymentTerms}
+                  onChange={(e) => setDetailsModal({ ...detailsModal, paymentTerms: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="modal-actions">
+              <button className="btn ghost" disabled={savingDetails} onClick={() => setDetailsModal(null)}>Cancel</button>
+              <button className="btn amber" disabled={savingDetails} onClick={saveDetails}>{savingDetails ? 'Saving…' : 'Save'}</button>
             </div>
           </>
         )}

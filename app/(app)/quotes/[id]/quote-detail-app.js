@@ -378,6 +378,7 @@ export default function QuoteDetailApp({ initialQuote, initialLineItems, clients
             <h2 className="section-title">Actions</h2>
             <div className="row-actions">
               {canPrint && <a className="btn ghost sm" href={`/quotes/${quote.id}/print`} target="_blank" rel="noreferrer">Print</a>}
+              {canPrint && <a className="btn ghost sm" href={`/api/quotes/${quote.id}/pdf`}>Download PDF</a>}
               {canPrint && <a className="btn ghost sm" href={`/api/quotes/${quote.id}/agreement`}>Work Agreement</a>}
               {fullAccess && <button className="btn ghost sm" disabled={duplicating} onClick={duplicateQuote}>{duplicating ? 'Duplicating…' : 'Duplicate'}</button>}
               {canConvert && <button className="btn amber sm" disabled={converting} onClick={convertToJob}>{converting ? 'Converting…' : 'Convert to Job'}</button>}

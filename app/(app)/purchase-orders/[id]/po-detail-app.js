@@ -1093,6 +1093,7 @@ export default function PoDetailApp({
             <h2 className="section-title">Actions</h2>
             <div className="row-actions">
               {canPrint && <a className="btn ghost sm" href={`/purchase-orders/${po.id}/print`} target="_blank" rel="noreferrer">Print</a>}
+              {canPrint && <a className="btn ghost sm" href={`/api/purchase-orders/${po.id}/pdf`}>Download PDF</a>}
               {fullAccess && <button className="btn ghost sm" disabled={duplicating} onClick={duplicatePo}>{duplicating ? 'Duplicating…' : 'Duplicate'}</button>}
               {canDelete && <button className="btn danger sm" disabled={deleting} onClick={deletePo}>{deleting ? 'Deleting…' : 'Delete Purchase Order'}</button>}
             </div>

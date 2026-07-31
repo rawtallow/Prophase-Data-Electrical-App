@@ -840,6 +840,7 @@ export default function JobDetailApp({
             <h2 className="section-title">Documents</h2>
             <div className="row-actions">
               {canPrintInvoice && <a className="btn ghost sm" href={`/jobs/${job.id}/invoice`} target="_blank" rel="noreferrer">View Invoice</a>}
+              {canPrintInvoice && <a className="btn ghost sm" href={`/api/jobs/${job.id}/invoice-pdf`}>Download Invoice PDF</a>}
               {canWarranty && <a className="btn ghost sm" href={`/api/jobs/${job.id}/warranty`}>Warranty</a>}
               {linkedQuote && <Link className="btn ghost sm" href={`/quotes/${linkedQuote.id}`}>View Source Quote</Link>}
             </div>

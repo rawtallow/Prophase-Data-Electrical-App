@@ -289,6 +289,26 @@ create table if not exists business_settings (
 );
 insert into business_settings (id) values (1) on conflict (id) do nothing;
 
+-- Company identity and remittance details, added when documents moved from
+-- browser print-to-PDF to generated PDFs. These aren't cosmetic: the ATO
+-- requires a valid tax invoice to carry the supplier's identity and ABN, and
+-- without bank details a customer receiving an invoice has no way to pay it.
+-- legal_name is the entity that actually issues the invoice — it can differ
+-- from the trading name shown in the app header, so it's stored separately
+-- rather than assumed. All nullable/defaulted so an un-filled install still
+-- renders a document (see lib/pdf/, which falls back to the trading name).
+alter table business_settings add column if not exists legal_name text default '';
+alter table business_settings add column if not exists abn text default '';
+alter table business_settings add column if not exists address text default '';
+alter table business_settings add column if not exists phone text default '';
+alter table business_settings add column if not exists email text default '';
+alter table business_settings add column if not exists website text default '';
+alter table business_settings add column if not exists bank_name text default '';
+alter table business_settings add column if not exists bank_bsb text default '';
+alter table business_settings add column if not exists bank_account text default '';
+-- Shown under the totals on an invoice, e.g. "Payment due within 14 days".
+alter table business_settings add column if not exists payment_terms text default '';
+
 -- Recurring service agreements (e.g. "Quarterly RCD Testing" for a
 -- commercial client) — the mechanism for turning one-off job income into
 -- a predictable, scheduled workload. next_due_date advances by `frequency`
