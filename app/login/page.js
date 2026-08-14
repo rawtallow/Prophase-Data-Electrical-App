@@ -40,7 +40,7 @@ export default function LoginPage() {
           <div className="bolt">&#9889;</div>
           <div>
             <h1 style={{ margin: 0, fontSize: 18, fontWeight: 750, color: '#0a0a0a', textAlign: 'left', letterSpacing: '-0.02em' }}>
-              Prophase
+              PROPHASE
             </h1>
           </div>
         </div>

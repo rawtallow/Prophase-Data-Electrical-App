@@ -70,7 +70,7 @@ export default function MobileNav({ role, badges = {} }) {
               <div className="brand">
                 <div className="bolt">&#9889;</div>
                 <div className="brand-text">
-                  <h1>Prophase Data and Electrical</h1>
+                  <h1>PROPHASE Data and Electrical</h1>
                   <div className="sub">Hub</div>
                 </div>
               </div>

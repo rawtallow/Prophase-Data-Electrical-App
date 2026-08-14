@@ -256,7 +256,7 @@ export default function ComplianceApp({ initialRecords, jobs, clients, employees
         <table>
           <thead><tr><th>Field</th><th>Value</th></tr></thead>
           <tbody>
-            <tr><td>Legal / Trading Name</td><td>{biz.legal_name || <span className="small-note">Prophase Data and Electrical</span>}</td></tr>
+            <tr><td>Legal / Trading Name</td><td>{biz.legal_name || <span className="small-note">PROPHASE Data and Electrical</span>}</td></tr>
             <tr><td>ABN</td><td>{biz.abn || <span className="badge lowstock">Not set</span>}</td></tr>
             <tr><td>Business Address</td><td>{biz.address || '—'}</td></tr>
             <tr><td>Phone</td><td>{biz.phone || '—'}</td></tr>
@@ -504,7 +504,7 @@ export default function ComplianceApp({ initialRecords, jobs, clients, employees
               <div className="field">
                 <label>Legal / Trading Name</label>
                 <input
-                  placeholder="Prophase Data and Electrical"
+                  placeholder="PROPHASE Data and Electrical"
                   value={detailsModal.legalName}
                   onChange={(e) => setDetailsModal({ ...detailsModal, legalName: e.target.value })}
                 />

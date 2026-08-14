@@ -53,7 +53,7 @@ export default async function JobInvoicePage({ params }) {
       </div>
       <div className="print-header">
         <div className="company">
-          Prophase Data and Electrical
+          PROPHASE Data and Electrical
           <div className="tag">Electrical Contracting Services</div>
         </div>
         <div className="print-meta">

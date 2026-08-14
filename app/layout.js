@@ -15,7 +15,7 @@ const inter = Inter({
 });
 
 export const metadata = {
-  title: 'Prophase Data and Electrical — Portal',
+  title: 'PROPHASE Data and Electrical — Portal',
   description: 'Quoting, job log, payroll, clients and spare parts.'
 };
 
