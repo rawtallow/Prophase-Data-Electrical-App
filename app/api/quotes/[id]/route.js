@@ -24,8 +24,11 @@ export async function GET(req, { params }) {
   if (!session || !CAN.viewQuotes(session.role)) return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
   const quotes = await sql`select * from quotes where id = ${params.id}`;
   if (!quotes[0]) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  const lineItems = await sql`select * from quote_line_items where quote_id = ${params.id} order by sort_order asc`;
-  return NextResponse.json({ ...serializeDates(quotes[0], QUOTE_DATE_FIELDS), lineItems });
+  const [lineItems, sends] = await Promise.all([
+    sql`select * from quote_line_items where quote_id = ${params.id} order by sort_order asc`,
+    sql`select * from document_sends where document_type = 'quote' and document_id = ${params.id} order by created_at desc`
+  ]);
+  return NextResponse.json({ ...serializeDates(quotes[0], QUOTE_DATE_FIELDS), lineItems, sends });
 }
 
 export async function PUT(req, { params }) {

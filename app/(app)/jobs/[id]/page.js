@@ -12,7 +12,7 @@ export default async function JobDetailPage({ params }) {
   const fullAccess = CAN.viewFinancials(session.role);
 
   const [
-    lineItems, payments, assignees, documents, activity, hourLogs,
+    lineItems, payments, assignees, documents, activity, hourLogs, sends,
     clients, employees, assets, quoteRows, laborRows, materialRows
   ] = await Promise.all([
     sql`select * from job_line_items where job_id = ${params.id} order by sort_order asc`,
@@ -21,6 +21,7 @@ export default async function JobDetailPage({ params }) {
     sql`select * from job_documents where job_id = ${params.id} order by created_at desc`,
     sql`select * from job_activity where job_id = ${params.id} order by created_at desc`,
     sql`select * from job_hour_logs where job_id = ${params.id} order by date desc, created_at desc`,
+    sql`select * from document_sends where document_type = 'invoice' and document_id = ${params.id} order by created_at desc`,
     sql`select id, name, phone, email, address from clients order by name asc`,
     sql`select id, name from employees where status = 'Active' order by name asc`,
     sql`select id, client_id, name from assets order by name asc`,
@@ -52,6 +53,7 @@ export default async function JobDetailPage({ params }) {
       initialDocuments={documents}
       initialActivity={activity}
       initialHourLogs={hourLogs}
+      initialSends={sends}
       clients={clients}
       employees={employees}
       assets={assets}

@@ -60,7 +60,12 @@ export async function performRestore(data) {
     sql`delete from parts`,
     sql`delete from suppliers`,
     sql`delete from clients`,
-    sql`delete from receipts`
+    sql`delete from receipts`,
+    // Neither references another table via a real foreign key (target_id/
+    // document_id deliberately aren't FKs — see their schema comments), so
+    // they're safe to delete/reinsert anywhere in this list.
+    sql`delete from approval_requests`,
+    sql`delete from document_sends`
   ];
 
   for (const c of data.clients) {
@@ -308,9 +313,40 @@ export async function performRestore(data) {
         public_liability_expiry = ${bs.public_liability_expiry || null},
         workers_comp_provider = ${bs.workers_comp_provider || ''},
         workers_comp_expiry = ${bs.workers_comp_expiry || null},
+        legal_name = ${bs.legal_name || ''},
+        abn = ${bs.abn || ''},
+        address = ${bs.address || ''},
+        phone = ${bs.phone || ''},
+        email = ${bs.email || ''},
+        website = ${bs.website || ''},
+        bank_name = ${bs.bank_name || ''},
+        bank_bsb = ${bs.bank_bsb || ''},
+        bank_account = ${bs.bank_account || ''},
+        payment_terms = ${bs.payment_terms || ''},
         updated_by = ${bs.updated_by || ''}
       where id = 1
     `);
+  }
+
+  // Optional — older backups won't have these; both need clients/quotes/jobs
+  // already inserted above for target_id/document_id to resolve to a real
+  // record (though neither column is an actual FK, so a stale reference from
+  // an older or trimmed backup won't fail the restore).
+  if (Array.isArray(data.approvalRequests)) {
+    for (const r of data.approvalRequests) {
+      queries.push(sql`
+        insert into approval_requests (id, action_type, target_id, target_label, payload, status, requested_by_id, requested_by, reviewed_by, review_note, created_at, reviewed_at)
+        values (${r.id}, ${r.action_type}, ${r.target_id || null}, ${r.target_label || ''}, ${JSON.stringify(r.payload || {})}, ${r.status || 'Pending'}, ${r.requested_by_id || null}, ${r.requested_by || ''}, ${r.reviewed_by || ''}, ${r.review_note || ''}, ${r.created_at}, ${r.reviewed_at || null})
+      `);
+    }
+  }
+  if (Array.isArray(data.documentSends)) {
+    for (const s of data.documentSends) {
+      queries.push(sql`
+        insert into document_sends (id, document_type, document_id, document_label, recipient_email, recipient_name, subject, body, status, error_message, sent_by, created_at)
+        values (${s.id}, ${s.document_type}, ${s.document_id}, ${s.document_label || ''}, ${s.recipient_email}, ${s.recipient_name || ''}, ${s.subject || ''}, ${s.body || ''}, ${s.status || 'Sent'}, ${s.error_message || ''}, ${s.sent_by || ''}, ${s.created_at})
+      `);
+    }
   }
 
   await sql.transaction(queries);

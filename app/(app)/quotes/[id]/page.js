@@ -9,10 +9,11 @@ export default async function QuoteDetailPage({ params }) {
   const quote = quotes[0];
   if (!quote) notFound();
 
-  const [lineItems, clients, jobs] = await Promise.all([
+  const [lineItems, clients, jobs, sends] = await Promise.all([
     sql`select * from quote_line_items where quote_id = ${params.id} order by sort_order asc`,
     sql`select id, name from clients order by name asc`,
-    sql`select id, job_number, status, amount_invoiced, amount_paid from jobs where quote_id = ${params.id}`
+    sql`select id, job_number, status, amount_invoiced, amount_paid from jobs where quote_id = ${params.id}`,
+    sql`select * from document_sends where document_type = 'quote' and document_id = ${params.id} order by created_at desc`
   ]);
 
   const fullAccess = CAN.editQuotes(session.role);
@@ -25,6 +26,7 @@ export default async function QuoteDetailPage({ params }) {
     <QuoteDetailApp
       initialQuote={quote}
       initialLineItems={lineItems}
+      initialSends={sends}
       clients={clients}
       linkedJob={jobs[0] || null}
       myId={session.id}

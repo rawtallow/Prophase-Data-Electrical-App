@@ -8,7 +8,7 @@ export async function GET() {
   const session = await getSession();
   if (!session || !CAN.backup(session.role)) return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
 
-  const [clients, assets, quotes, quoteLineItems, jobs, jobLineItems, jobPayments, jobAssignees, jobDocuments, jobActivity, jobHourLogs, employees, payrollEntries, payrollAllocations, ownerDraws, parts, partSerials, counters, receipts, complianceRecords, businessSettings, maintenanceContracts, suppliers, purchaseOrders, purchaseOrderLineItems, purchaseOrderInvoices, purchaseOrderInvoiceLineItems, purchaseOrderInvoicePayments, poDocuments, poActivity] = await Promise.all([
+  const [clients, assets, quotes, quoteLineItems, jobs, jobLineItems, jobPayments, jobAssignees, jobDocuments, jobActivity, jobHourLogs, employees, payrollEntries, payrollAllocations, ownerDraws, parts, partSerials, counters, receipts, complianceRecords, businessSettings, maintenanceContracts, suppliers, purchaseOrders, purchaseOrderLineItems, purchaseOrderInvoices, purchaseOrderInvoiceLineItems, purchaseOrderInvoicePayments, poDocuments, poActivity, approvalRequests, documentSends] = await Promise.all([
     sql`select * from clients`,
     sql`select * from assets`,
     sql`select * from quotes`,
@@ -38,12 +38,18 @@ export async function GET() {
     sql`select * from purchase_order_invoice_line_items`,
     sql`select * from purchase_order_invoice_payments`,
     sql`select * from po_documents`,
-    sql`select * from po_activity`
+    sql`select * from po_activity`,
+    // Not a foreign key on anything (approval_requests.target_id spans
+    // several different tables depending on action_type, same reasoning as
+    // document_sends below), so these two are safe to restore alongside
+    // everything else.
+    sql`select * from approval_requests`,
+    sql`select * from document_sends`
   ]);
 
   const dump = {
     exportedAt: new Date().toISOString(),
-    clients, assets, quotes, quoteLineItems, jobs, jobLineItems, jobPayments, jobAssignees, jobDocuments, jobActivity, jobHourLogs, employees, payrollEntries, payrollAllocations, ownerDraws, parts, partSerials, counters, receipts, complianceRecords, businessSettings, maintenanceContracts, suppliers, purchaseOrders, purchaseOrderLineItems, purchaseOrderInvoices, purchaseOrderInvoiceLineItems, purchaseOrderInvoicePayments, poDocuments, poActivity
+    clients, assets, quotes, quoteLineItems, jobs, jobLineItems, jobPayments, jobAssignees, jobDocuments, jobActivity, jobHourLogs, employees, payrollEntries, payrollAllocations, ownerDraws, parts, partSerials, counters, receipts, complianceRecords, businessSettings, maintenanceContracts, suppliers, purchaseOrders, purchaseOrderLineItems, purchaseOrderInvoices, purchaseOrderInvoiceLineItems, purchaseOrderInvoicePayments, poDocuments, poActivity, approvalRequests, documentSends
   };
 
   return new NextResponse(JSON.stringify(dump, null, 2), {

@@ -8,7 +8,7 @@ import { getJson, PENDING_APPROVAL_MESSAGE } from '../../../../lib/api';
 
 const TABS = ['Overview', 'Quote Details', 'Line Items', 'Client', 'Status', 'Documents', 'Notes', 'History'];
 
-export default function QuoteDetailApp({ initialQuote, initialLineItems, clients, linkedJob, myId, fullAccess, canEdit }) {
+export default function QuoteDetailApp({ initialQuote, initialLineItems, initialSends, clients, linkedJob, myId, fullAccess, canEdit }) {
   const router = useRouter();
   const [quote, setQuote] = useState(initialQuote);
   const [lineItems, setLineItems] = useState(
@@ -16,6 +16,7 @@ export default function QuoteDetailApp({ initialQuote, initialLineItems, clients
       ? initialLineItems.map((li) => ({ description: li.description, qty: li.qty, price: li.price }))
       : [{ description: '', qty: 1, price: 0 }]
   );
+  const [sends, setSends] = useState(initialSends);
   const [tab, setTab] = useState('Overview');
   const [saving, setSaving] = useState(false);
 
@@ -24,6 +25,51 @@ export default function QuoteDetailApp({ initialQuote, initialLineItems, clients
   const [duplicating, setDuplicating] = useState(false);
   const [converting, setConverting] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  const [emailForm, setEmailForm] = useState(null);
+  const [sendingEmail, setSendingEmail] = useState(false);
+
+  function openEmailForm() {
+    setEmailForm({
+      to: quote.client_email || '',
+      subject: `Quote ${quote.quote_number} from PROPHASE Data and Electrical`,
+      body:
+        `Hi ${quote.client_name || 'there'},\n\n` +
+        `Please find attached our quote ${quote.quote_number}${quote.job_description ? ` for ${quote.job_description}` : ''}.\n\n` +
+        `Total: ${money(quote.total)} (incl. GST)\n` +
+        (quote.valid_until ? `Valid until: ${fmtDate(quote.valid_until)}\n\n` : '\n') +
+        `If you have any questions or you're happy to go ahead, just reply to this email.\n\n` +
+        `Thanks,\nPROPHASE Data and Electrical`
+    });
+  }
+
+  async function sendQuoteEmail() {
+    if (!emailForm.to.trim()) return toast.error('Enter a recipient email address');
+    const ok = await confirmDialog(`Send this quote to ${emailForm.to.trim()}?`, {
+      title: 'Email quote',
+      confirmLabel: 'Send Email'
+    });
+    if (!ok) return;
+    setSendingEmail(true);
+    try {
+      const res = await fetch(`/api/quotes/${quote.id}/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(emailForm)
+      });
+      const d = await res.json().catch(() => ({}));
+      if (res.ok) {
+        toast.success(`Quote emailed to ${emailForm.to.trim()}`);
+        if (d.quote) setQuote(d.quote);
+        setEmailForm(null);
+        try { setSends(await getJson(`/api/quotes/${quote.id}`).then((q) => q.sends)); } catch { /* history refresh is best-effort */ }
+      } else {
+        toast.error(d.error || 'Could not send email');
+      }
+    } finally {
+      setSendingEmail(false);
+    }
+  }
 
   function set(field, value) { setQuote({ ...quote, [field]: value }); }
 
@@ -379,12 +425,36 @@ export default function QuoteDetailApp({ initialQuote, initialLineItems, clients
             <div className="row-actions">
               {canPrint && <a className="btn ghost sm" href={`/quotes/${quote.id}/print`} target="_blank" rel="noreferrer">Print</a>}
               {canPrint && <a className="btn ghost sm" href={`/api/quotes/${quote.id}/pdf`}>Download PDF</a>}
+              {canPrint && !emailForm && <button className="btn amber sm" onClick={openEmailForm}>Email Quote</button>}
               {canPrint && <a className="btn ghost sm" href={`/api/quotes/${quote.id}/agreement`}>Work Agreement</a>}
               {fullAccess && <button className="btn ghost sm" disabled={duplicating} onClick={duplicateQuote}>{duplicating ? 'Duplicating…' : 'Duplicate'}</button>}
               {canConvert && <button className="btn amber sm" disabled={converting} onClick={convertToJob}>{converting ? 'Converting…' : 'Convert to Job'}</button>}
               {canDelete && <button className="btn danger sm" disabled={deleting} onClick={deleteQuote}>{deleting ? 'Deleting…' : 'Delete Quote'}</button>}
             </div>
             {linkedJob && <p className="small-note" style={{ marginTop: 10 }}>Already converted to job {linkedJob.job_number} — Convert to Job is hidden.</p>}
+
+            {emailForm && (
+              <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
+                <h3 style={{ marginTop: 0 }}>Email Quote {quote.quote_number}</h3>
+                <div className="field">
+                  <label>To</label>
+                  <input type="email" value={emailForm.to} onChange={(e) => setEmailForm({ ...emailForm, to: e.target.value })} />
+                </div>
+                <div className="field">
+                  <label>Subject</label>
+                  <input value={emailForm.subject} onChange={(e) => setEmailForm({ ...emailForm, subject: e.target.value })} />
+                </div>
+                <div className="field">
+                  <label>Message</label>
+                  <textarea rows={8} value={emailForm.body} onChange={(e) => setEmailForm({ ...emailForm, body: e.target.value })} />
+                </div>
+                <p className="small-note">The PDF quote is attached automatically. Sending marks this quote as Sent.</p>
+                <div className="row-actions">
+                  <button className="btn ghost sm" disabled={sendingEmail} onClick={() => setEmailForm(null)}>Cancel</button>
+                  <button className="btn amber sm" disabled={sendingEmail} onClick={sendQuoteEmail}>{sendingEmail ? 'Sending…' : 'Send Email'}</button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -440,6 +510,33 @@ export default function QuoteDetailApp({ initialQuote, initialLineItems, clients
                 <div className="small-note">Converted to Job</div>
                 <div>{linkedJob.job_number} — <span className={`badge ${slug(linkedJob.status)}`}>{linkedJob.status}</span></div>
               </div>
+            )}
+          </div>
+
+          <div className="panel">
+            <h2 className="section-title">Emails Sent</h2>
+            {sends.length === 0 ? (
+              <div className="empty">This quote hasn&apos;t been emailed yet.</div>
+            ) : (
+              <table>
+                <thead><tr><th>Date</th><th>To</th><th>Subject</th><th>By</th><th>Status</th></tr></thead>
+                <tbody>
+                  {sends.map((s) => (
+                    <tr key={s.id}>
+                      <td data-label="Date">{fmtDate(s.created_at)}</td>
+                      <td data-label="To">{s.recipient_email}</td>
+                      <td data-label="Subject">{s.subject}</td>
+                      <td data-label="By">{s.sent_by || '—'}</td>
+                      <td data-label="Status">
+                        <span className={`badge ${s.status === 'Sent' ? 'activestatus' : 'lowstock'}`}>{s.status}</span>
+                        {s.status === 'Failed' && s.error_message && (
+                          <div className="small-note" style={{ marginTop: 2 }}>{s.error_message}</div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             )}
           </div>
         </div>

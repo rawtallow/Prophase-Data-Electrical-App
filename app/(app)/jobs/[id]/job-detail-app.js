@@ -18,7 +18,7 @@ function emptyPaymentForm() { return { amount: '', date: today(), method: 'Bank 
 function emptyHourForm() { return { employeeId: '', date: today(), hours: '', notes: '' }; }
 
 export default function JobDetailApp({
-  initialJob, initialLineItems, initialPayments, initialAssignees, initialDocuments, initialActivity, initialHourLogs,
+  initialJob, initialLineItems, initialPayments, initialAssignees, initialDocuments, initialActivity, initialHourLogs, initialSends,
   clients, employees, assets, linkedQuote, laborCost, actualHours, materialsCost, fullAccess, canManageJobs
 }) {
   const router = useRouter();
@@ -29,6 +29,9 @@ export default function JobDetailApp({
   const [documents, setDocuments] = useState(initialDocuments);
   const [activity, setActivity] = useState(initialActivity);
   const [hourLogs, setHourLogs] = useState(initialHourLogs);
+  const [sends, setSends] = useState(initialSends);
+  const [emailForm, setEmailForm] = useState(null);
+  const [sendingEmail, setSendingEmail] = useState(false);
   const [tab, setTab] = useState('Overview');
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -75,6 +78,51 @@ export default function JobDetailApp({
 
   const currentClient = clients.find((c) => c.id === job.client_id) || null;
   const assetsForClient = assets.filter((a) => a.client_id === job.client_id);
+
+  function openEmailForm() {
+    const invoiced = Number(job.amount_invoiced);
+    const paid = Number(job.amount_paid);
+    const balanceDue = invoiced - paid;
+    setEmailForm({
+      to: currentClient?.email || '',
+      subject: `Tax Invoice ${job.job_number} from PROPHASE Data and Electrical`,
+      body:
+        `Hi ${job.client_name || 'there'},\n\n` +
+        `Please find attached our tax invoice ${job.job_number}${job.job_title ? ` for ${job.job_title}` : ''}.\n\n` +
+        `Total: ${money(invoiced)}\n` +
+        (paid > 0 ? `Paid to date: ${money(paid)}\n` : '') +
+        `Balance due: ${money(balanceDue)}\n\n` +
+        `If you have any questions, just reply to this email.\n\n` +
+        `Thanks,\nPROPHASE Data and Electrical`
+    });
+  }
+
+  async function sendInvoiceEmail() {
+    if (!emailForm.to.trim()) return toast.error('Enter a recipient email address');
+    const ok = await confirmDialog(`Send this invoice to ${emailForm.to.trim()}?`, {
+      title: 'Email invoice',
+      confirmLabel: 'Send Email'
+    });
+    if (!ok) return;
+    setSendingEmail(true);
+    try {
+      const res = await fetch(`/api/jobs/${job.id}/send-invoice`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(emailForm)
+      });
+      const d = await res.json().catch(() => ({}));
+      if (res.ok) {
+        toast.success(`Invoice emailed to ${emailForm.to.trim()}`);
+        setEmailForm(null);
+        try { setSends(await getJson(`/api/jobs/${job.id}`).then((j) => j.sends)); } catch { /* history refresh is best-effort */ }
+      } else {
+        toast.error(d.error || 'Could not send email');
+      }
+    } finally {
+      setSendingEmail(false);
+    }
+  }
 
   // Every tab shares this one Save — the PUT always replaces the whole
   // record, so whichever tab's Save button was clicked, the payload carries
@@ -751,6 +799,35 @@ export default function JobDetailApp({
               <div><div className="small-note">Last Updated</div>{job.updated_at ? fmtDate(job.updated_at) : '—'}</div>
             </div>
           </div>
+
+          {fullAccess && (
+            <div className="panel">
+              <h2 className="section-title">Emails Sent</h2>
+              {sends.length === 0 ? (
+                <div className="empty">This invoice hasn&apos;t been emailed yet.</div>
+              ) : (
+                <table>
+                  <thead><tr><th>Date</th><th>To</th><th>Subject</th><th>By</th><th>Status</th></tr></thead>
+                  <tbody>
+                    {sends.map((s) => (
+                      <tr key={s.id}>
+                        <td data-label="Date">{fmtDate(s.created_at)}</td>
+                        <td data-label="To">{s.recipient_email}</td>
+                        <td data-label="Subject">{s.subject}</td>
+                        <td data-label="By">{s.sent_by || '—'}</td>
+                        <td data-label="Status">
+                          <span className={`badge ${s.status === 'Sent' ? 'activestatus' : 'lowstock'}`}>{s.status}</span>
+                          {s.status === 'Failed' && s.error_message && (
+                            <div className="small-note" style={{ marginTop: 2 }}>{s.error_message}</div>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -841,9 +918,33 @@ export default function JobDetailApp({
             <div className="row-actions">
               {canPrintInvoice && <a className="btn ghost sm" href={`/jobs/${job.id}/invoice`} target="_blank" rel="noreferrer">View Invoice</a>}
               {canPrintInvoice && <a className="btn ghost sm" href={`/api/jobs/${job.id}/invoice-pdf`}>Download Invoice PDF</a>}
+              {canPrintInvoice && !emailForm && <button className="btn amber sm" onClick={openEmailForm}>Email Invoice</button>}
               {canWarranty && <a className="btn ghost sm" href={`/api/jobs/${job.id}/warranty`}>Warranty</a>}
               {linkedQuote && <Link className="btn ghost sm" href={`/quotes/${linkedQuote.id}`}>View Source Quote</Link>}
             </div>
+
+            {emailForm && (
+              <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
+                <h3 style={{ marginTop: 0 }}>Email Invoice {job.job_number}</h3>
+                <div className="field">
+                  <label>To</label>
+                  <input type="email" value={emailForm.to} onChange={(e) => setEmailForm({ ...emailForm, to: e.target.value })} />
+                </div>
+                <div className="field">
+                  <label>Subject</label>
+                  <input value={emailForm.subject} onChange={(e) => setEmailForm({ ...emailForm, subject: e.target.value })} />
+                </div>
+                <div className="field">
+                  <label>Message</label>
+                  <textarea rows={8} value={emailForm.body} onChange={(e) => setEmailForm({ ...emailForm, body: e.target.value })} />
+                </div>
+                <p className="small-note">The tax invoice PDF is attached automatically.</p>
+                <div className="row-actions">
+                  <button className="btn ghost sm" disabled={sendingEmail} onClick={() => setEmailForm(null)}>Cancel</button>
+                  <button className="btn amber sm" disabled={sendingEmail} onClick={sendInvoiceEmail}>{sendingEmail ? 'Sending…' : 'Send Email'}</button>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="panel" style={{ borderColor: 'var(--red)' }}>

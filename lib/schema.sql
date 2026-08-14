@@ -657,3 +657,26 @@ create table if not exists approval_requests (
   created_at timestamptz not null default now(),
   reviewed_at timestamptz
 );
+
+-- One generic log for every emailed document (a quote or a job tax invoice),
+-- rather than a separate table per document type — mirrors approval_requests'
+-- reasoning. document_id isn't a foreign key: a quote and a job are
+-- different tables, and this row should survive as an audit trail even if
+-- the source record is later deleted. document_label is a display snapshot
+-- (quote/job number) for the same reason. Read by the History tab on the
+-- quote/job detail page, filtered by document_type + document_id.
+create table if not exists document_sends (
+  id uuid primary key default gen_random_uuid(),
+  document_type text not null, -- 'quote' | 'invoice'
+  document_id uuid not null,
+  document_label text not null default '',
+  recipient_email text not null,
+  recipient_name text default '',
+  subject text not null default '',
+  body text default '',
+  status text not null default 'Sent', -- 'Sent' | 'Failed'
+  error_message text default '',
+  sent_by text not null default '',
+  created_at timestamptz not null default now()
+);
+create index if not exists document_sends_lookup_idx on document_sends (document_type, document_id);
