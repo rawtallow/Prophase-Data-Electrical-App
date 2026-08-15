@@ -13,7 +13,9 @@ export default async function QuoteDetailPage({ params }) {
     sql`select * from quote_line_items where quote_id = ${params.id} order by sort_order asc`,
     sql`select id, name from clients order by name asc`,
     sql`select id, job_number, status, amount_invoiced, amount_paid from jobs where quote_id = ${params.id}`,
-    sql`select * from document_sends where document_type = 'quote' and document_id = ${params.id} order by created_at desc`
+    // Falls back to [] rather than letting a missing/not-yet-migrated
+    // document_sends table 500 out the whole page.
+    sql`select * from document_sends where document_type = 'quote' and document_id = ${params.id} order by created_at desc`.catch(() => [])
   ]);
 
   const fullAccess = CAN.editQuotes(session.role);

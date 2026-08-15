@@ -55,11 +55,18 @@ export async function POST(req, { params }) {
 
     return NextResponse.json({ ok: true, quote: rows[0] || null });
   } catch (err) {
-    await sql`
-      insert into document_sends (document_type, document_id, document_label, recipient_email, recipient_name, subject, body, status, error_message, sent_by)
-      values ('quote', ${params.id}, ${doc.quote.quote_number}, ${recipient}, ${doc.quote.client_name}, ${subject.trim()}, ${body || ''}, 'Failed', ${err.message || 'Unknown error'}, ${session.name})
-    `;
     console.error('Send quote email error:', err);
+    // Best-effort: logging the failure must never hide the failure itself
+    // (e.g. if document_sends' own migration hasn't landed yet, that
+    // insert would throw too) — swallow this one and still return err.
+    try {
+      await sql`
+        insert into document_sends (document_type, document_id, document_label, recipient_email, recipient_name, subject, body, status, error_message, sent_by)
+        values ('quote', ${params.id}, ${doc.quote.quote_number}, ${recipient}, ${doc.quote.client_name}, ${subject.trim()}, ${body || ''}, 'Failed', ${err.message || 'Unknown error'}, ${session.name})
+      `;
+    } catch (logErr) {
+      console.error('Could not log failed send:', logErr);
+    }
     return NextResponse.json({ error: err.message || 'Could not send email' }, { status: 502 });
   }
 }

@@ -21,7 +21,9 @@ export default async function JobDetailPage({ params }) {
     sql`select * from job_documents where job_id = ${params.id} order by created_at desc`,
     sql`select * from job_activity where job_id = ${params.id} order by created_at desc`,
     sql`select * from job_hour_logs where job_id = ${params.id} order by date desc, created_at desc`,
-    sql`select * from document_sends where document_type = 'invoice' and document_id = ${params.id} order by created_at desc`,
+    // Falls back to [] rather than letting a missing/not-yet-migrated
+    // document_sends table 500 out the whole page.
+    sql`select * from document_sends where document_type = 'invoice' and document_id = ${params.id} order by created_at desc`.catch(() => []),
     sql`select id, name, phone, email, address from clients order by name asc`,
     sql`select id, name from employees where status = 'Active' order by name asc`,
     sql`select id, client_id, name from assets order by name asc`,

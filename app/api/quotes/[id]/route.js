@@ -26,7 +26,11 @@ export async function GET(req, { params }) {
   if (!quotes[0]) return NextResponse.json({ error: 'Not found' }, { status: 404 });
   const [lineItems, sends] = await Promise.all([
     sql`select * from quote_line_items where quote_id = ${params.id} order by sort_order asc`,
-    sql`select * from document_sends where document_type = 'quote' and document_id = ${params.id} order by created_at desc`
+    // Falls back to [] rather than letting a missing/not-yet-migrated
+    // document_sends table 500 out the entire quote page — the email
+    // feature degrading is much better than the whole record becoming
+    // unreachable.
+    sql`select * from document_sends where document_type = 'quote' and document_id = ${params.id} order by created_at desc`.catch(() => [])
   ]);
   return NextResponse.json({ ...serializeDates(quotes[0], QUOTE_DATE_FIELDS), lineItems, sends });
 }
