@@ -622,6 +622,21 @@ create table if not exists job_hour_logs (
   created_at timestamptz not null default now()
 );
 
+-- Review/payment lifecycle, added so an approved entry's hours can pre-fill
+-- a pay run's job allocations instead of being re-typed — and so nothing
+-- gets paid twice. Pending -> Approved (an admin/director confirms both the
+-- hours and, since employee_id is very often null on a self-logged entry,
+-- resolves exactly which employee they belong to) or Rejected -> Paid (set
+-- automatically once pulled into a saved pay run, alongside payroll_entry_id
+-- linking back to it). payroll_allocations remains the only thing that
+-- feeds labor $ cost / Statistics — these columns never do on their own.
+alter table job_hour_logs add column if not exists status text not null default 'Pending';
+alter table job_hour_logs add column if not exists reviewed_by text default '';
+alter table job_hour_logs add column if not exists reviewed_at timestamptz;
+alter table job_hour_logs add column if not exists review_note text default '';
+alter table job_hour_logs add column if not exists payroll_entry_id uuid references payroll_entries(id) on delete set null;
+create index if not exists job_hour_logs_status_idx on job_hour_logs (status, employee_id);
+
 -- Director/Subadmin roles. 'admin' is kept in the allowed list purely for
 -- backward compatibility with old backup files and any stray row — no new
 -- admin accounts are created going forward, only director/subadmin/manager/

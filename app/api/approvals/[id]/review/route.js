@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { sql, isForeignKeyViolation } from '../../../../../lib/db';
 import { getSession, CAN } from '../../../../../lib/auth';
 import { performRestore } from '../../../backup/import/route';
+import { markHourLogsPaid } from '../../../payroll/route';
 
 export const runtime = 'nodejs';
 
@@ -103,7 +104,7 @@ async function performApprovedAction(request, reviewer) {
       return rows[0];
     }
     case 'create_payroll_entry': {
-      const { employeeId, hourlyRate, datePaid, periodStart, periodEnd, allocations, netPay, notes } = payload;
+      const { employeeId, hourlyRate, datePaid, periodStart, periodEnd, allocations, netPay, notes, hourLogIds } = payload;
       const emps = await sql`select * from employees where id = ${employeeId}`;
       const emp = emps[0];
       if (!emp) throw new Error('Employee not found');
@@ -120,6 +121,11 @@ async function performApprovedAction(request, reviewer) {
       for (const a of cleanAllocs) {
         await sql`insert into payroll_allocations (payroll_entry_id, job_id, reg_hours, ot_hours) values (${entry.id}, ${a.jobId || null}, ${Number(a.regHours) || 0}, ${Number(a.otHours) || 0})`;
       }
+      // Imported rather than reimplemented: this one needs status/employee
+      // guards that must not drift from the direct path, and a queued
+      // request may sit here for days before approval, so an hour log
+      // could have changed state in the meantime.
+      await markHourLogsPaid(hourLogIds, entry.id, emp.id);
       return entry;
     }
     case 'create_owner_draw': {

@@ -25,6 +25,73 @@ export default function PayrollApp({ initialEmployees, initialEntries, initialDr
   const [savingDraw, setSavingDraw] = useState(false);
   const [busyId, setBusyId] = useState(null);
 
+  // Pending hour logs awaiting review. Loaded on demand when the Hours tab
+  // is first opened rather than server-side with the rest of the page —
+  // this is a secondary workflow, and it keeps the main Payroll page from
+  // depending on the job_hour_logs review columns existing.
+  const [pendingHours, setPendingHours] = useState(null);
+  const [loadingHours, setLoadingHours] = useState(false);
+  const [reviewChoice, setReviewChoice] = useState({});
+  const [reviewingId, setReviewingId] = useState(null);
+  const [pullingHours, setPullingHours] = useState(false);
+
+  async function loadPendingHours() {
+    setLoadingHours(true);
+    try {
+      setPendingHours(await getList('/api/hour-logs?status=Pending'));
+    } catch (err) {
+      toast.error(err.message);
+      setPendingHours([]);
+    } finally {
+      setLoadingHours(false);
+    }
+  }
+
+  function openHoursTab() {
+    setSub('hours');
+    if (pendingHours === null && !loadingHours) loadPendingHours();
+  }
+
+  // A self-logged entry usually has no employee_id (the session can't be
+  // resolved to an employees row — see app/api/jobs/[id]/hours/route.js), so
+  // the reviewer confirms who it belongs to. Pre-select the best guess by
+  // matching the logged name against the employee list, since the employee
+  // record is often a longer version of the same name ("Justin Savino" the
+  // login vs "Justin Savino - Director / Senior Technician" the employee).
+  function guessEmployeeId(log) {
+    if (log.employee_id) return log.employee_id;
+    const name = (log.employee_name || '').trim().toLowerCase();
+    if (!name) return '';
+    const match = employees.find(
+      (e) => e.name.toLowerCase() === name || e.name.toLowerCase().startsWith(name) || name.startsWith(e.name.toLowerCase())
+    );
+    return match ? match.id : '';
+  }
+
+  async function reviewHourLog(log, decision) {
+    const employeeId = decision === 'approved' ? (reviewChoice[log.id] ?? guessEmployeeId(log)) : null;
+    if (decision === 'approved' && !employeeId) {
+      return toast.error('Select which employee these hours belong to');
+    }
+    setReviewingId(log.id);
+    try {
+      const res = await fetch(`/api/hour-logs/${log.id}/review`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ decision, employeeId })
+      });
+      const d = await res.json().catch(() => ({}));
+      if (res.ok) {
+        toast.success(decision === 'approved' ? 'Hours approved' : 'Hours rejected');
+        setPendingHours(pendingHours.filter((h) => h.id !== log.id));
+      } else {
+        toast.error(d.error || 'Could not save review');
+      }
+    } finally {
+      setReviewingId(null);
+    }
+  }
+
   async function refreshAll() {
     try {
       const [e, p, d] = await Promise.all([
@@ -107,7 +174,48 @@ export default function PayrollApp({ initialEmployees, initialEntries, initialDr
   // ---- pay runs ----
   function emptyAllocation() { return { jobId: '', regHours: 0, otHours: 0 }; }
   function emptyPay() {
-    return { employeeId: '', hourlyRate: 0, datePaid: today(), periodStart: '', periodEnd: '', notes: '', netPay: 0, netTouched: false, allocations: [emptyAllocation()] };
+    return { employeeId: '', hourlyRate: 0, datePaid: today(), periodStart: '', periodEnd: '', notes: '', netPay: 0, netTouched: false, allocations: [emptyAllocation()], hourLogIds: [] };
+  }
+
+  // Pulls the selected employee's already-approved, not-yet-paid hours for
+  // the chosen period and turns them into allocation rows — summed per job,
+  // since one job typically has several days' entries. All pulled hours land
+  // in Reg; splitting Reg vs OT is a judgement call about the employee's
+  // whole week, not something a per-job log can answer, so the reviewer
+  // adjusts afterwards. hourLogIds rides along on the save so the API can
+  // mark exactly these entries Paid.
+  async function pullApprovedHours() {
+    if (!payModal.employeeId) return toast.error('Select an employee first');
+    if (!payModal.periodStart || !payModal.periodEnd) return toast.error('Set the pay period dates first');
+    setPullingHours(true);
+    try {
+      const params = new URLSearchParams({
+        status: 'Approved',
+        employeeId: payModal.employeeId,
+        from: payModal.periodStart,
+        to: payModal.periodEnd
+      });
+      const logs = await getList(`/api/hour-logs?${params}`);
+      if (logs.length === 0) {
+        toast('No approved hours found for that employee and period');
+        return;
+      }
+      const byJob = new Map();
+      for (const l of logs) {
+        byJob.set(l.job_id, (byJob.get(l.job_id) || 0) + Number(l.hours));
+      }
+      const allocations = [...byJob.entries()].map(([jobId, hours]) => ({
+        jobId, regHours: Number(hours.toFixed(2)), otHours: 0
+      }));
+      const next = { ...payModal, allocations, hourLogIds: logs.map((l) => l.id) };
+      const totals = payTotals(next);
+      setPayModal({ ...next, netPay: next.netTouched ? next.netPay : totals.gross.toFixed(2) });
+      toast.success(`Pulled ${logs.length} approved ${logs.length === 1 ? 'entry' : 'entries'} across ${allocations.length} ${allocations.length === 1 ? 'job' : 'jobs'}`);
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setPullingHours(false);
+    }
   }
   function openNewPay() { setPayModal(emptyPay()); }
   function openEditPay(e) {
@@ -122,7 +230,12 @@ export default function PayrollApp({ initialEmployees, initialEntries, initialDr
       notes: e.notes || '',
       netPay: e.net_pay,
       netTouched: true,
-      allocations: e.allocations.length ? e.allocations.map((a) => ({ jobId: a.job_id || '', regHours: a.reg_hours, otHours: a.ot_hours })) : [emptyAllocation()]
+      allocations: e.allocations.length ? e.allocations.map((a) => ({ jobId: a.job_id || '', regHours: a.reg_hours, otHours: a.ot_hours })) : [emptyAllocation()],
+      // Deliberately empty when editing: the hours this run was originally
+      // built from are already marked Paid and linked to it. Re-sending
+      // their ids would be a no-op (markHourLogsPaid only touches rows
+      // still Approved), but leaving it empty keeps the intent obvious.
+      hourLogIds: []
     });
   }
   function payTotals(pm) {
@@ -156,6 +269,10 @@ export default function PayrollApp({ initialEmployees, initialEntries, initialDr
         } else {
           toast.success(payModal.id ? 'Pay run updated' : 'Pay run saved');
           await refreshAll();
+          // Any hours pulled into this run just flipped to Paid, so the
+          // review queue's counts are stale — only worth refetching if
+          // the Hours tab has actually been opened at some point.
+          if (pendingHours !== null) await loadPendingHours();
         }
         setPayModal(null);
       } else {
@@ -244,6 +361,9 @@ export default function PayrollApp({ initialEmployees, initialEntries, initialDr
 
       <div className="subtabs">
         <a className={sub === 'employees' ? 'active' : ''} onClick={() => setSub('employees')} style={{ cursor: 'pointer' }}>Employees</a>
+        <a className={sub === 'hours' ? 'active' : ''} onClick={openHoursTab} style={{ cursor: 'pointer' }}>
+          Hours{pendingHours && pendingHours.length > 0 ? ` (${pendingHours.length})` : ''}
+        </a>
         <a className={sub === 'payruns' ? 'active' : ''} onClick={() => setSub('payruns')} style={{ cursor: 'pointer' }}>Pay Runs</a>
         <a className={sub === 'draws' ? 'active' : ''} onClick={() => setSub('draws')} style={{ cursor: 'pointer' }}>Owner Draws</a>
       </div>
@@ -291,6 +411,66 @@ export default function PayrollApp({ initialEmployees, initialEntries, initialDr
               </tbody>
             </table>
             {employees.length === 0 && <div className="empty">No employees yet. Add your crew here so you can log their pay runs.</div>}
+          </div>
+        </div>
+      )}
+
+      {sub === 'hours' && (
+        <div key={sub} className="page-transition">
+          <div className="toolbar">
+            <h2 className="section-title" style={{ margin: 0 }}>Hours Awaiting Review</h2>
+            <button className="btn ghost sm" disabled={loadingHours} onClick={loadPendingHours}>
+              {loadingHours ? 'Refreshing…' : 'Refresh'}
+            </button>
+          </div>
+          <div className="panel small-note" style={{ marginBottom: 14 }}>
+            Hours logged by the crew against a job land here first. Approving one confirms both the
+            hours and which employee they belong to — approved hours can then be pulled straight into
+            a pay run instead of being typed in again. Nothing here affects labour cost or margin
+            figures until it&apos;s part of a saved pay run.
+          </div>
+          <div className="panel">
+            {loadingHours && pendingHours === null ? (
+              <div className="empty">Loading…</div>
+            ) : (pendingHours || []).length === 0 ? (
+              <div className="empty">No hours waiting for review.</div>
+            ) : (
+              <table>
+                <thead>
+                  <tr><th>Date</th><th>Job</th><th>Logged By</th><th className="num">Hours</th><th>Notes</th><th style={{ width: '20%' }}>Employee</th><th>Actions</th></tr>
+                </thead>
+                <tbody>
+                  {pendingHours.map((h) => {
+                    const busy = reviewingId === h.id;
+                    const chosen = reviewChoice[h.id] ?? guessEmployeeId(h);
+                    return (
+                      <tr key={h.id}>
+                        <td data-label="Date">{fmtDate(h.date)}</td>
+                        <td data-label="Job">{h.job_number} — {h.client_name}</td>
+                        <td data-label="Logged By">{h.employee_name || '—'}</td>
+                        <td className="num" data-label="Hours">{Number(h.hours).toFixed(2)}</td>
+                        <td data-label="Notes">{h.notes || '—'}</td>
+                        <td data-label="Employee">
+                          <select
+                            value={chosen}
+                            onChange={(e) => setReviewChoice({ ...reviewChoice, [h.id]: e.target.value })}
+                          >
+                            <option value="">Select employee…</option>
+                            {employees.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
+                          </select>
+                        </td>
+                        <td>
+                          <div className="row-actions">
+                            <button className="btn danger sm" disabled={busy} onClick={() => reviewHourLog(h, 'rejected')}>Reject</button>
+                            <button className="btn amber sm" disabled={busy} onClick={() => reviewHourLog(h, 'approved')}>{busy ? '…' : 'Approve'}</button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
       )}
@@ -423,7 +603,26 @@ export default function PayrollApp({ initialEmployees, initialEntries, initialDr
               <div className="field"><label>Pay Period End</label><input type="date" value={payModal.periodEnd} onChange={(e) => setPayModal({ ...payModal, periodEnd: e.target.value })} /></div>
             </div>
 
-            <h2 className="section-title" style={{ marginTop: 8 }}>Hours by Job</h2>
+            <div className="toolbar" style={{ marginTop: 8, marginBottom: 8 }}>
+              <h2 className="section-title" style={{ margin: 0 }}>Hours by Job</h2>
+              {!payModal.id && (
+                <button className="btn ghost sm" disabled={pullingHours} onClick={pullApprovedHours}>
+                  {pullingHours ? 'Pulling…' : 'Pull In Approved Hours'}
+                </button>
+              )}
+            </div>
+            {!payModal.id && (
+              <p className="small-note" style={{ marginTop: -4 }}>
+                Set the employee and pay period above, then pull in their approved hours instead of
+                re-typing them. Pulled hours land in Reg — move any across to OT as needed.
+              </p>
+            )}
+            {payModal.hourLogIds?.length > 0 && (
+              <p className="small-note">
+                {payModal.hourLogIds.length} approved {payModal.hourLogIds.length === 1 ? 'entry' : 'entries'} will
+                be marked as paid when you save this run.
+              </p>
+            )}
             <table>
               <thead><tr><th style={{ width: '44%' }}>Job</th><th className="num">Reg Hrs</th><th className="num">OT Hrs</th><th className="num">Labor Cost</th><th></th></tr></thead>
               <tbody>

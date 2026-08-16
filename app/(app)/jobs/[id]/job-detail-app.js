@@ -596,7 +596,7 @@ export default function JobDetailApp({
               <div className="empty">No hours logged yet.</div>
             ) : (
               <table>
-                <thead><tr><th>Date</th><th>Technician</th><th className="num">Hours</th><th>Notes</th><th></th></tr></thead>
+                <thead><tr><th>Date</th><th>Technician</th><th className="num">Hours</th><th>Notes</th><th>Status</th><th></th></tr></thead>
                 <tbody>
                   {hourLogs.map((h) => (
                     <tr key={h.id}>
@@ -604,7 +604,17 @@ export default function JobDetailApp({
                       <td data-label="Technician">{h.employee_name}</td>
                       <td className="num" data-label="Hours">{Number(h.hours).toFixed(2)}</td>
                       <td data-label="Notes">{h.notes || '—'}</td>
-                      <td>{fullAccess && <button className="btn danger sm" disabled={deletingHourId === h.id} onClick={() => deleteHourLog(h.id)}>{deletingHourId === h.id ? '…' : 'Delete'}</button>}</td>
+                      <td data-label="Status"><span className={`badge ${slug(h.status || 'Pending')}`}>{h.status || 'Pending'}</span></td>
+                      <td>
+                        {/* A Paid entry is linked to a saved pay run — deleting
+                            it would leave that run's hours unaccounted for, so
+                            it's blocked here rather than silently allowed. */}
+                        {fullAccess && h.status !== 'Paid' && (
+                          <button className="btn danger sm" disabled={deletingHourId === h.id} onClick={() => deleteHourLog(h.id)}>
+                            {deletingHourId === h.id ? '…' : 'Delete'}
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

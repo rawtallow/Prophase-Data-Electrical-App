@@ -12,6 +12,19 @@ export async function DELETE(req, { params }) {
   if (!session || !CAN.viewFinancials(session.role)) {
     return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
   }
+  // A Paid entry has already been pulled into a saved pay run and carries
+  // that run's payroll_entry_id — deleting it would leave the run's hours
+  // unaccounted for. The UI hides the button for these, but the rule is
+  // enforced here too in case the endpoint is hit directly.
+  const rows = await sql`select status from job_hour_logs where id = ${params.logId} and job_id = ${params.id}`;
+  if (!rows[0]) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  if (rows[0].status === 'Paid') {
+    return NextResponse.json(
+      { error: 'These hours have already been paid through a pay run and can\'t be deleted.' },
+      { status: 409 }
+    );
+  }
+
   await sql`delete from job_hour_logs where id = ${params.logId} and job_id = ${params.id}`;
   return NextResponse.json({ ok: true });
 }

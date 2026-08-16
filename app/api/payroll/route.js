@@ -10,6 +10,30 @@ async function nextPayNumber() {
   return 'PR-' + String(rows[0].value).padStart(4, '0');
 }
 
+// Marks the hour logs that were pulled into a pay run as Paid and links
+// them back to it, so the same hours can't be pulled into a second run.
+//
+// Exported because the Subadmin approval queue replays this same action
+// later from a stored payload (see the create_payroll_entry case in
+// app/api/approvals/[id]/review/route.js) and must not drift from it.
+//
+// The status/employee filters in the WHERE clause are the real safety
+// mechanism, not the id list: only rows that are still Approved and
+// genuinely belong to this employee flip to Paid. A stale id, an entry
+// someone else already processed, or a mismatched employee is silently
+// skipped rather than being wrongly marked paid — which matters most on
+// the approval path, where the request may sit in the queue for days
+// before a Director approves it.
+export async function markHourLogsPaid(hourLogIds, payrollEntryId, employeeId) {
+  const ids = (hourLogIds || []).filter(Boolean);
+  if (ids.length === 0) return;
+  await sql`
+    update job_hour_logs
+    set status = 'Paid', payroll_entry_id = ${payrollEntryId}
+    where id = any(${ids}) and status = 'Approved' and employee_id = ${employeeId}
+  `;
+}
+
 export async function GET() {
   const session = await getSession();
   if (!session || !CAN.viewPayroll(session.role)) return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
@@ -27,7 +51,7 @@ export async function POST(req) {
   const session = await getSession();
   if (!session || !CAN.editPayroll(session.role)) return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
 
-  const { employeeId, hourlyRate, datePaid, periodStart, periodEnd, allocations, netPay, notes } = await req.json();
+  const { employeeId, hourlyRate, datePaid, periodStart, periodEnd, allocations, netPay, notes, hourLogIds } = await req.json();
   if (!employeeId) return NextResponse.json({ error: 'Select an employee' }, { status: 400 });
   if (periodStart && periodEnd && periodStart > periodEnd) {
     return NextResponse.json({ error: 'Pay period start must be on or before the end date' }, { status: 400 });
@@ -42,7 +66,7 @@ export async function POST(req) {
     actionType: 'create_payroll_entry',
     targetId: null,
     targetLabel: `Pay run for ${emp.name}`,
-    payload: { employeeId, hourlyRate, datePaid, periodStart, periodEnd, allocations, netPay, notes },
+    payload: { employeeId, hourlyRate, datePaid, periodStart, periodEnd, allocations, netPay, notes, hourLogIds },
     execute: async () => {
       const rate = Number(hourlyRate) || 0;
       const cleanAllocs = (allocations || []).filter((a) => (Number(a.regHours) || 0) > 0 || (Number(a.otHours) || 0) > 0);
@@ -61,6 +85,7 @@ export async function POST(req) {
           values (${entry.id}, ${a.jobId || null}, ${Number(a.regHours) || 0}, ${Number(a.otHours) || 0})
         `;
       }
+      await markHourLogsPaid(hourLogIds, entry.id, emp.id);
       return entry;
     }
   });
