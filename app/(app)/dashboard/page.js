@@ -3,6 +3,7 @@ import { getSession, CAN } from '../../../lib/auth';
 import { sql } from '../../../lib/db';
 import { money, slug, toDisplayDate as fmtDate } from '../../../lib/format';
 import { NavIcon } from '../nav-items';
+import { loadAlerts } from '../../../lib/alerts';
 
 function firstName(name) {
   return String(name || '').trim().split(/\s+/)[0] || '';
@@ -29,16 +30,70 @@ function QuickActions() {
   );
 }
 
+// Everything with a date on it that has lapsed or is about to — retests,
+// licences, insurance, unpaid balances, quotes going cold. All of this was
+// already in the database; nothing surfaced it until now, so it only got
+// noticed if someone opened the right page on the right day.
+function AlertsPanel({ alerts }) {
+  if (alerts.length === 0) {
+    return (
+      <div className="panel">
+        <h2 className="section-title">Needs Attention</h2>
+        <div className="empty">Nothing overdue or coming up. All clear.</div>
+      </div>
+    );
+  }
+
+  const overdue = alerts.filter((a) => a.severity === 'overdue');
+  const soon = alerts.filter((a) => a.severity === 'soon');
+  // Long lists get truncated rather than pushing the rest of the dashboard
+  // off-screen — the point is to flag, not to be a full worklist.
+  const SHOWN = 8;
+  const shown = alerts.slice(0, SHOWN);
+  const hidden = alerts.length - shown.length;
+
+  return (
+    <div className="panel">
+      <div className="toolbar" style={{ marginBottom: 12 }}>
+        <h2 className="section-title" style={{ margin: 0 }}>Needs Attention</h2>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {overdue.length > 0 && <span className="badge overdue">{overdue.length} overdue</span>}
+          {soon.length > 0 && <span className="badge soon">{soon.length} coming up</span>}
+        </div>
+      </div>
+      <div className="alert-list">
+        {shown.map((a) => (
+          <Link key={a.id} href={a.href} className={`alert-row ${a.severity}`}>
+            <span className="alert-cat">{a.category}</span>
+            <span className="alert-main">
+              <span className="alert-title">{a.title}</span>
+              <span className="alert-detail">{a.detail}</span>
+            </span>
+          </Link>
+        ))}
+      </div>
+      {hidden > 0 && (
+        <p className="small-note" style={{ marginTop: 10 }}>
+          + {hidden} more {hidden === 1 ? 'item' : 'items'} not shown.
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default async function DashboardPage() {
   const session = await getSession();
   const fullAccess = CAN.viewFinancials(session.role);
 
-  const [jobs, parts, quotes, payrollEntries, draws] = await Promise.all([
+  const [jobs, parts, quotes, payrollEntries, draws, alerts] = await Promise.all([
     sql`select * from jobs order by created_date desc limit 200`,
     sql`select * from parts`,
     fullAccess ? sql`select * from quotes order by created_at desc limit 200` : Promise.resolve([]),
     fullAccess ? sql`select * from payroll_entries` : Promise.resolve([]),
-    fullAccess ? sql`select * from owner_draws` : Promise.resolve([])
+    fullAccess ? sql`select * from owner_draws` : Promise.resolve([]),
+    // Dashboard is the landing page — an alert query failing must never
+    // leave the whole page blank.
+    loadAlerts({ fullAccess }).catch(() => [])
   ]);
   const lowStock = parts.filter((p) => Number(p.reorder_threshold) > 0 && Number(p.qty_on_hand) <= Number(p.reorder_threshold));
 
@@ -54,6 +109,8 @@ export default async function DashboardPage() {
         </div>
 
         <QuickActions />
+
+        <AlertsPanel alerts={alerts} />
 
         <div className="cards">
           <div className="card">
@@ -127,6 +184,8 @@ export default async function DashboardPage() {
         <div className="card warn"><div className="label">Payroll + Draws This Month</div><div className="value">{money(payrollThisMonth)}</div></div>
         <div className={`card${lowStock.length ? ' warn' : ''}`}><div className="label">Low Stock Parts</div><div className="value">{lowStock.length}</div></div>
       </div>
+
+      <AlertsPanel alerts={alerts} />
 
       <div className="panel card-table">
         <h2 className="section-title">Recent Quotes</h2>

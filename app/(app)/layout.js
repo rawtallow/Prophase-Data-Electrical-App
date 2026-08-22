@@ -6,6 +6,7 @@ import MobileNav from './mobile-nav';
 import AccountArea from './account-area';
 import { FeedbackHost } from './ui-feedback';
 import PageTransition from './page-transition';
+import { countOverdueAlerts } from '../../lib/alerts';
 
 export default async function AppLayout({ children }) {
   const session = await getSession();
@@ -15,13 +16,21 @@ export default async function AppLayout({ children }) {
   // roles that can actually act on them, so an employee's every-page-load
   // never pays for a query whose result they'd never see anyway.
   const canApprove = CAN.editQuotes(session.role) || CAN.editPurchaseOrders(session.role);
-  const [pendingQuotes, pendingPOs] = canApprove
+  const [pendingQuotes, pendingPOs, overdueAlerts] = canApprove
     ? await Promise.all([
         sql`select count(*)::int as n from quotes where approval_status = 'Pending Approval'`,
-        sql`select count(*)::int as n from purchase_orders where approval_status = 'Pending Approval'`
+        sql`select count(*)::int as n from purchase_orders where approval_status = 'Pending Approval'`,
+        // One combined query, not loadAlerts() — see the comment on
+        // countOverdueAlerts. Falls back to 0 so a database missing any of
+        // the tables it touches can never take down every page's nav.
+        countOverdueAlerts().catch(() => 0)
       ])
-    : [[{ n: 0 }], [{ n: 0 }]];
-  const badges = { '/quotes': pendingQuotes[0].n, '/purchase-orders': pendingPOs[0].n };
+    : [[{ n: 0 }], [{ n: 0 }], 0];
+  const badges = {
+    '/quotes': pendingQuotes[0].n,
+    '/purchase-orders': pendingPOs[0].n,
+    '/dashboard': overdueAlerts
+  };
 
   return (
     <>
