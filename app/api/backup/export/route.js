@@ -8,7 +8,7 @@ export async function GET() {
   const session = await getSession();
   if (!session || !CAN.backup(session.role)) return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
 
-  const [clients, assets, quotes, quoteLineItems, jobs, jobLineItems, jobPayments, jobAssignees, jobDocuments, jobActivity, jobHourLogs, employees, payrollEntries, payrollAllocations, ownerDraws, parts, partSerials, counters, receipts, complianceRecords, businessSettings, maintenanceContracts, suppliers, purchaseOrders, purchaseOrderLineItems, purchaseOrderInvoices, purchaseOrderInvoiceLineItems, purchaseOrderInvoicePayments, poDocuments, poActivity, approvalRequests, documentSends] = await Promise.all([
+  const [clients, assets, quotes, quoteLineItems, jobs, jobLineItems, jobPayments, jobAssignees, jobDocuments, jobActivity, jobHourLogs, employees, payrollEntries, payrollAllocations, ownerDraws, parts, partSerials, counters, receipts, complianceRecords, businessSettings, maintenanceContracts, suppliers, purchaseOrders, purchaseOrderLineItems, purchaseOrderInvoices, purchaseOrderInvoiceLineItems, purchaseOrderInvoicePayments, poDocuments, poActivity, approvalRequests, documentSends, poNumberPool] = await Promise.all([
     sql`select * from clients`,
     sql`select * from assets`,
     sql`select * from quotes`,
@@ -44,12 +44,15 @@ export async function GET() {
     // document_sends below), so these two are safe to restore alongside
     // everything else.
     sql`select * from approval_requests`,
-    sql`select * from document_sends`
+    sql`select * from document_sends`,
+    // Released PO numbers awaiting reuse. Without this a restore silently
+    // forgets them, so a cancelled PO's number is never handed out again.
+    sql`select * from po_number_pool`
   ]);
 
   const dump = {
     exportedAt: new Date().toISOString(),
-    clients, assets, quotes, quoteLineItems, jobs, jobLineItems, jobPayments, jobAssignees, jobDocuments, jobActivity, jobHourLogs, employees, payrollEntries, payrollAllocations, ownerDraws, parts, partSerials, counters, receipts, complianceRecords, businessSettings, maintenanceContracts, suppliers, purchaseOrders, purchaseOrderLineItems, purchaseOrderInvoices, purchaseOrderInvoiceLineItems, purchaseOrderInvoicePayments, poDocuments, poActivity, approvalRequests, documentSends
+    clients, assets, quotes, quoteLineItems, jobs, jobLineItems, jobPayments, jobAssignees, jobDocuments, jobActivity, jobHourLogs, employees, payrollEntries, payrollAllocations, ownerDraws, parts, partSerials, counters, receipts, complianceRecords, businessSettings, maintenanceContracts, suppliers, purchaseOrders, purchaseOrderLineItems, purchaseOrderInvoices, purchaseOrderInvoiceLineItems, purchaseOrderInvoicePayments, poDocuments, poActivity, approvalRequests, documentSends, poNumberPool
   };
 
   return new NextResponse(JSON.stringify(dump, null, 2), {

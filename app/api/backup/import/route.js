@@ -65,7 +65,8 @@ export async function performRestore(data) {
     // document_id deliberately aren't FKs — see their schema comments), so
     // they're safe to delete/reinsert anywhere in this list.
     sql`delete from approval_requests`,
-    sql`delete from document_sends`
+    sql`delete from document_sends`,
+    sql`delete from po_number_pool`
   ];
 
   for (const c of data.clients) {
@@ -337,6 +338,14 @@ export async function performRestore(data) {
       queries.push(sql`
         insert into approval_requests (id, action_type, target_id, target_label, payload, status, requested_by_id, requested_by, reviewed_by, review_note, created_at, reviewed_at)
         values (${r.id}, ${r.action_type}, ${r.target_id || null}, ${r.target_label || ''}, ${JSON.stringify(r.payload || {})}, ${r.status || 'Pending'}, ${r.requested_by_id || null}, ${r.requested_by || ''}, ${r.reviewed_by || ''}, ${r.review_note || ''}, ${r.created_at}, ${r.reviewed_at || null})
+      `);
+    }
+  }
+  if (Array.isArray(data.poNumberPool)) {
+    for (const n of data.poNumberPool) {
+      queries.push(sql`
+        insert into po_number_pool (po_number, released_at)
+        values (${n.po_number}, ${n.released_at})
       `);
     }
   }
