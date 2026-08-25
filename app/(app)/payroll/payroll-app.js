@@ -374,7 +374,7 @@ export default function PayrollApp({ initialEmployees, initialEntries, initialDr
             <h2 className="section-title" style={{ margin: 0 }}>Employees</h2>
             <button className="btn amber sm" onClick={() => setEmpModal(emptyEmp())}>+ New Employee</button>
           </div>
-          <div className="panel">
+          <div className="panel card-table">
             <table>
               <thead><tr><th>Name</th><th>Phone</th><th className="num">Hourly Rate</th><th>Status</th><th>License</th><th className="num">Total Paid</th><th>Actions</th></tr></thead>
               <tbody>
@@ -384,22 +384,26 @@ export default function PayrollApp({ initialEmployees, initialEntries, initialDr
                   const warn = licenseWarning(e.license_expiry);
                   return (
                     <tr key={e.id}>
-                      <td>{e.name}</td>
-                      <td>{e.phone || '—'}</td>
-                      <td className="num">{money(e.hourly_rate)}/hr</td>
-                      <td><span className={`badge ${e.status === 'Inactive' ? 'inactive' : 'activestatus'}`}>{e.status}</span></td>
-                      <td>
-                        {e.license_number || '—'}
-                        {e.license_expiry && (
-                          <div>
+                      <td data-label="Name">{e.name}</td>
+                      <td data-label="Phone">{e.phone || '—'}</td>
+                      <td className="num" data-label="Hourly Rate">{money(e.hourly_rate)}/hr</td>
+                      <td data-label="Status"><span className={`badge ${e.status === 'Inactive' ? 'inactive' : 'activestatus'}`}>{e.status}</span></td>
+                      <td data-label="License">
+                        {/* One wrapper, not a bare text node plus a div: in the
+                            mobile card layout each <td> is a flex row, so two
+                            loose children compete for width and break the licence
+                            number across lines. */}
+                        <span className="stack-end">
+                          <span>{e.license_number || '—'}</span>
+                          {e.license_expiry && (
                             <span className={`badge ${warn ? 'lowstock' : 'instock'}`}>
                               {warn === 'expired' ? 'Expired' : warn === 'expiring' ? 'Expiring Soon' : 'Valid'} {dstr(e.license_expiry)}
                             </span>
-                          </div>
-                        )}
+                          )}
+                        </span>
                       </td>
-                      <td className="num">{money(ytd)}</td>
-                      <td>
+                      <td className="num" data-label="Total Paid">{money(ytd)}</td>
+                      <td className="cell-actions" data-label="">
                         <div className="row-actions">
                           <button className="btn ghost sm" disabled={busy} onClick={() => setEmpModal({ id: e.id, name: e.name, phone: e.phone || '', hourlyRate: e.hourly_rate, status: e.status, licenseNumber: e.license_number || '', licenseExpiry: dstr(e.license_expiry) })}>Edit</button>
                           <button className="btn danger sm" disabled={busy} onClick={() => delEmp(e.id)}>{busy ? 'Deleting…' : 'Delete'}</button>
@@ -429,7 +433,7 @@ export default function PayrollApp({ initialEmployees, initialEntries, initialDr
             a pay run instead of being typed in again. Nothing here affects labour cost or margin
             figures until it&apos;s part of a saved pay run.
           </div>
-          <div className="panel">
+          <div className="panel card-table">
             {loadingHours && pendingHours === null ? (
               <div className="empty">Loading…</div>
             ) : (pendingHours || []).length === 0 ? (
@@ -459,7 +463,7 @@ export default function PayrollApp({ initialEmployees, initialEntries, initialDr
                             {employees.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
                           </select>
                         </td>
-                        <td>
+                        <td className="cell-actions" data-label="">
                           <div className="row-actions">
                             <button className="btn danger sm" disabled={busy} onClick={() => reviewHourLog(h, 'rejected')}>Reject</button>
                             <button className="btn amber sm" disabled={busy} onClick={() => reviewHourLog(h, 'approved')}>{busy ? '…' : 'Approve'}</button>
@@ -487,7 +491,7 @@ export default function PayrollApp({ initialEmployees, initialEntries, initialDr
               <button className="btn amber sm" onClick={openNewPay}>+ New Pay Run</button>
             </div>
           </div>
-          <div className="panel">
+          <div className="panel card-table">
             <table>
               <thead><tr><th>Pay #</th><th>Employee</th><th>Period</th><th>Date Paid</th><th className="num">Hours (Reg/OT)</th><th className="num">Gross</th><th className="num">Net Paid</th><th>Actions</th></tr></thead>
               <tbody>
@@ -497,14 +501,14 @@ export default function PayrollApp({ initialEmployees, initialEntries, initialDr
                   const busy = busyId === e.id;
                   return (
                     <tr key={e.id}>
-                      <td>{e.pay_number}</td>
-                      <td>{e.employee_name}</td>
-                      <td>{fmtDate(e.period_start)} – {fmtDate(e.period_end)}</td>
-                      <td>{fmtDate(e.date_paid)}</td>
-                      <td className="num">{totalReg.toFixed(1)} / {totalOt.toFixed(1)}</td>
-                      <td className="num">{money(e.gross_pay)}</td>
-                      <td className="num" style={{ fontWeight: 700 }}>{money(e.net_pay)}</td>
-                      <td>
+                      <td data-label="Pay #">{e.pay_number}</td>
+                      <td data-label="Employee">{e.employee_name}</td>
+                      <td data-label="Period">{fmtDate(e.period_start)} – {fmtDate(e.period_end)}</td>
+                      <td data-label="Date Paid">{fmtDate(e.date_paid)}</td>
+                      <td className="num" data-label="Hours (Reg/OT)">{totalReg.toFixed(1)} / {totalOt.toFixed(1)}</td>
+                      <td className="num" data-label="Gross">{money(e.gross_pay)}</td>
+                      <td className="num" data-label="Net Paid" style={{ fontWeight: 700 }}>{money(e.net_pay)}</td>
+                      <td className="cell-actions" data-label="">
                         <div className="row-actions">
                           <button className="btn ghost sm" disabled={busy} onClick={() => openEditPay(e)}>Edit</button>
                           <button className="btn danger sm" disabled={busy} onClick={() => delPay(e.id)}>{busy ? 'Deleting…' : 'Delete'}</button>
@@ -529,7 +533,7 @@ export default function PayrollApp({ initialEmployees, initialEntries, initialDr
           <div className="panel small-note" style={{ marginBottom: 0 }}>
             Owner draws are distributions to yourself from business profit — not a taxed payroll wage. Talk to your accountant about how draws vs. salary affect your self-employment taxes.
           </div>
-          <div className="panel">
+          <div className="panel card-table">
             <table>
               <thead><tr><th>Date</th><th>Note</th><th className="num">Amount</th><th>Actions</th></tr></thead>
               <tbody>
@@ -537,10 +541,10 @@ export default function PayrollApp({ initialEmployees, initialEntries, initialDr
                   const busy = busyId === d.id;
                   return (
                     <tr key={d.id}>
-                      <td>{fmtDate(d.date)}</td>
-                      <td>{d.note || '—'}</td>
-                      <td className="num" style={{ fontWeight: 700 }}>{money(d.amount)}</td>
-                      <td>
+                      <td data-label="Date">{fmtDate(d.date)}</td>
+                      <td data-label="Note">{d.note || '—'}</td>
+                      <td className="num" data-label="Amount" style={{ fontWeight: 700 }}>{money(d.amount)}</td>
+                      <td className="cell-actions" data-label="">
                         <div className="row-actions">
                           <button className="btn ghost sm" disabled={busy} onClick={() => setDrawModal({ id: d.id, date: dstr(d.date), amount: d.amount, note: d.note || '' })}>Edit</button>
                           <button className="btn danger sm" disabled={busy} onClick={() => delDraw(d.id)}>{busy ? 'Deleting…' : 'Delete'}</button>

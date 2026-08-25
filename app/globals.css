@@ -450,6 +450,12 @@ tr:hover td { background: var(--bg-soft); }
   background-attachment: local, local, scroll, scroll;
 }
 .panel > table { min-width: 620px; }
+/* Simple two/three-column label-value tables (Business Details, licence and
+   insurance summaries) carry no data worth 620px, so the blanket min-width
+   above only forced them to scroll sideways on a phone for no reason. This
+   opts an individual panel out. */
+.panel.narrow-table > table { min-width: 0; }
+.panel.narrow-table td:first-child { white-space: normal; color: var(--text-mute); }
 /* Short values shouldn't fragment across lines just because the table is
    tight — only free-text columns (descriptions, notes) should wrap. */
 table th { white-space: nowrap; }
@@ -923,43 +929,60 @@ select {
   @keyframes toastInMobile { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
   @keyframes toastOutMobile { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(16px); } }
 
-  /* ---- Card tables: rows reflow to labeled cards ---- */
-  .card-table.panel { padding: 0; background: transparent; border: none; box-shadow: none; overflow: visible; }
-  .card-table table { min-width: 0; font-size: 14px; }
-  .card-table thead { display: none; }
-  .card-table tbody, .card-table tr, .card-table td { display: block; width: auto; }
-  .card-table tr {
-    background: var(--card); border: 1px solid var(--border); border-radius: var(--r);
-    box-shadow: var(--sh-sm); padding: 6px 15px; margin-bottom: 11px;
-  }
-  .card-table tr:hover td { background: transparent; }
-  .card-table td {
-    padding: 9px 0; border-bottom: 1px solid var(--border); text-align: left !important;
-    display: flex; justify-content: space-between; align-items: center; gap: 14px;
-  }
-  .card-table td:last-child { border-bottom: none; }
-  .card-table td::before {
-    content: attr(data-label); flex-shrink: 0;
-    font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text-faint);
-  }
-  .card-table td[data-label=""]::before { content: none; }
-  /* first column pinned styles must be reset in card mode */
-  .card-table td:first-child { position: static; box-shadow: none; }
-  .card-table td:first-child::after { display: none; }
-  /* ...as must the desktop no-wrap rules, or long values overflow the card */
-  .card-table td, .card-table td:first-child, .card-table td.num,
-  .card-table td.cell-actions, .card-table td[data-label] { white-space: normal; }
-  .card-table.panel { background-image: none; }
-  .card-table td.num { justify-content: space-between; }
-  /* Action rows go full width under a label */
-  .card-table td.cell-actions { display: block; padding-top: 12px; }
-  .card-table td.cell-actions::before { display: block; margin-bottom: 8px; }
-  .card-table .row-actions { gap: 8px; }
-  .card-table .row-actions .btn { flex: 1; min-width: 84px; }
-  /* Emphasize the first field as the card's title */
-  .card-table td:first-child { font-weight: 700; font-size: 15px; }
-  .card-table td:first-child::before { font-size: 10.5px; font-weight: 700; color: var(--text-faint); }
 }
+
+/* ============================================================
+   CARD TABLES  (phone only)
+   ============================================================
+   Rows reflow into labeled cards. Deliberately a narrower breakpoint than
+   the 820px shell swap above: the touch nav and bottom-sheet modals are
+   right for a tablet, but the card layout is not — a 620px table fits
+   comfortably inside a 768px tablet (738px of content width after the
+   15px gutters), and forcing cards there strands every label far from its
+   value across a very wide row. Below 700px the table stops fitting, which
+   is where cards start to earn their place. */
+@media (max-width: 700px) {
+/* ---- Card tables: rows reflow to labeled cards ---- */
+.card-table.panel { padding: 0; background: transparent; border: none; box-shadow: none; overflow: visible; }
+.card-table table { min-width: 0; font-size: 14px; }
+.card-table thead { display: none; }
+.card-table tbody, .card-table tr, .card-table td { display: block; width: auto; }
+.card-table tr {
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--r);
+  box-shadow: var(--sh-sm); padding: 6px 15px; margin-bottom: 11px;
+}
+.card-table tr:hover td { background: transparent; }
+.card-table td {
+  padding: 9px 0; border-bottom: 1px solid var(--border); text-align: left !important;
+  display: flex; justify-content: space-between; align-items: center; gap: 14px;
+}
+.card-table td:last-child { border-bottom: none; }
+.card-table td::before {
+  content: attr(data-label); flex-shrink: 0;
+  font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text-faint);
+}
+.card-table td[data-label=""]::before { content: none; }
+/* first column pinned styles must be reset in card mode */
+.card-table td:first-child { position: static; box-shadow: none; }
+.card-table td:first-child::after { display: none; }
+/* ...as must the desktop no-wrap rules, or long values overflow the card */
+.card-table td, .card-table td:first-child, .card-table td.num,
+.card-table td.cell-actions, .card-table td[data-label] { white-space: normal; }
+.card-table.panel { background-image: none; }
+.card-table td.num { justify-content: space-between; }
+/* Action rows go full width under a label */
+.card-table td.cell-actions { display: block; padding-top: 12px; }
+.card-table td.cell-actions::before { display: block; margin-bottom: 8px; }
+.card-table .row-actions { gap: 8px; }
+.card-table .row-actions .btn { flex: 1; min-width: 84px; }
+/* Emphasize the first field as the card's title */
+.card-table td:first-child { font-weight: 700; font-size: 15px; }
+.card-table td:first-child::before { font-size: 10.5px; font-weight: 700; color: var(--text-faint); }
+/* A cell holding a value plus a badge: keep them as one right-aligned
+   block so the value can't be squeezed and hyphenated by the badge. */
+.card-table td .stack-end { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; text-align: right; }
+}
+
 
 @media (max-width: 380px) {
   .cards { grid-template-columns: 1fr; }

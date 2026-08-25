@@ -590,7 +590,7 @@ export default function JobDetailApp({
             )}
           </div>
 
-          <div className="panel">
+          <div className="panel card-table">
             <h2 className="section-title">Hour Log</h2>
             {hourLogs.length === 0 ? (
               <div className="empty">No hours logged yet.</div>
@@ -605,7 +605,7 @@ export default function JobDetailApp({
                       <td className="num" data-label="Hours">{Number(h.hours).toFixed(2)}</td>
                       <td data-label="Notes">{h.notes || '—'}</td>
                       <td data-label="Status"><span className={`badge ${slug(h.status || 'Pending')}`}>{h.status || 'Pending'}</span></td>
-                      <td>
+                      <td className="cell-actions" data-label="">
                         {/* A Paid entry is linked to a saved pay run — deleting
                             it would leave that run's hours unaccounted for, so
                             it's blocked here rather than silently allowed. */}
@@ -709,7 +709,7 @@ export default function JobDetailApp({
 
       {tab === 'Documents' && (
         <div key={tab} className="page-transition">
-          <div className="panel">
+          <div className="panel card-table">
             <h2 className="section-title">Photos, Documents &amp; Permits</h2>
             {documents.length === 0 ? (
               <div className="empty">No files uploaded yet.</div>
@@ -723,7 +723,7 @@ export default function JobDetailApp({
                       <td data-label="Category"><span className={`badge ${slug(d.category)}`}>{d.category}</span></td>
                       <td data-label="Uploaded By">{d.uploaded_by}</td>
                       <td data-label="Date">{fmtDate(d.created_at)}</td>
-                      <td>
+                      <td className="cell-actions" data-label="">
                         {canManageJobs && (
                           <button className="btn danger sm" disabled={deletingDocId === d.id} onClick={() => deleteDocument(d.id)}>
                             {deletingDocId === d.id ? '…' : 'Delete'}
@@ -811,7 +811,7 @@ export default function JobDetailApp({
           </div>
 
           {fullAccess && (
-            <div className="panel">
+            <div className="panel card-table">
               <h2 className="section-title">Emails Sent</h2>
               {sends.length === 0 ? (
                 <div className="empty">This invoice hasn&apos;t been emailed yet.</div>
@@ -872,7 +872,7 @@ export default function JobDetailApp({
             </div>
           </div>
 
-          <div className="panel">
+          <div className="panel card-table">
             <h2 className="section-title">Payment History</h2>
             {payments.length === 0 ? (
               <div className="empty">No payments logged yet.</div>
@@ -885,7 +885,7 @@ export default function JobDetailApp({
                       <td data-label="Date">{dstr(p.date)}</td>
                       <td data-label="Method">{p.method || '—'}</td>
                       <td className="num" data-label="Amount">{money(p.amount)}</td>
-                      <td>
+                      <td className="cell-actions" data-label="">
                         <button className="btn danger sm" disabled={voidingId === p.id} onClick={() => voidPayment(p.id)}>
                           {voidingId === p.id ? 'Voiding…' : 'Void'}
                         </button>

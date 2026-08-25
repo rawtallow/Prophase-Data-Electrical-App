@@ -109,6 +109,20 @@ create table if not exists quote_line_items (
   sort_order int not null default 0
 );
 
+-- Defined before `jobs` because jobs.assigned_to_id has a foreign key to it.
+-- Postgres resolves references at CREATE time, so a fresh run of this file
+-- fails if employees comes later — which it did until this was moved.
+create table if not exists employees (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  phone text default '',
+  hourly_rate numeric not null default 0,
+  status text not null default 'Active',
+  user_id uuid references users(id),
+  license_number text default '',
+  license_expiry date
+);
+
 create table if not exists jobs (
   id uuid primary key default gen_random_uuid(),
   job_number text not null,
@@ -169,17 +183,6 @@ create table if not exists job_payments (
   note text default '',
   created_by text default '',
   created_at timestamptz not null default now()
-);
-
-create table if not exists employees (
-  id uuid primary key default gen_random_uuid(),
-  name text not null,
-  phone text default '',
-  hourly_rate numeric not null default 0,
-  status text not null default 'Active',
-  user_id uuid references users(id),
-  license_number text default '',
-  license_expiry date
 );
 
 create table if not exists payroll_entries (

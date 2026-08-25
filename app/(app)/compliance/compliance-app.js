@@ -241,7 +241,7 @@ export default function ComplianceApp({ initialRecords, jobs, clients, employees
         <div className={`card${totalExpiringSoon ? ' warn' : ''}`}><div className="label">Licenses / Insurance Expiring Soon</div><div className="value">{totalExpiringSoon}</div></div>
       </div>
 
-      <div className="panel">
+      <div className="panel narrow-table">
         <div className="toolbar" style={{ marginBottom: 12 }}>
           <h2 className="section-title" style={{ margin: 0 }}>Business Details</h2>
           {canManage && <button className="btn ghost sm" onClick={openDetailsEdit}>Edit</button>}
@@ -275,7 +275,7 @@ export default function ComplianceApp({ initialRecords, jobs, clients, employees
         </table>
       </div>
 
-      <div className="panel">
+      <div className="panel narrow-table">
         <div className="toolbar" style={{ marginBottom: 12 }}>
           <h2 className="section-title" style={{ margin: 0 }}>Business License &amp; Insurance</h2>
           {canManage && <button className="btn ghost sm" onClick={openBizEdit}>Edit</button>}
@@ -320,7 +320,7 @@ export default function ComplianceApp({ initialRecords, jobs, clients, employees
         </table>
       </div>
 
-      <div className="panel">
+      <div className="panel narrow-table">
         <h2 className="section-title">Licensed Team</h2>
         <table>
           <thead><tr><th>Name</th><th>License Number</th><th>Expiry</th></tr></thead>
